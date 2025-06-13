@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import welch
 import mne
+from .time_frequency import morlet_spectrogram, plot_morlet_spectrogram
 
 def plot_eeg(time, eeg_ch, title="EEG Trace", start=0, fs=200, duration=5):
     """

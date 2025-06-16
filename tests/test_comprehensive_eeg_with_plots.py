@@ -10,7 +10,7 @@ import sys
 import os
 
 # Add the main directory to path and import as package
-sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from eeg_analysis_package.eeg_analysis import *
 from eeg_analysis_package.time_frequency import *
 from eeg_analysis_package.analysis_utils import *

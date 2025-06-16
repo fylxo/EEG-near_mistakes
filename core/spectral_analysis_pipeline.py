@@ -14,8 +14,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import os
+import sys
 from typing import Dict, List, Tuple, Optional, Union
 from collections import defaultdict
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import from existing package
 from eeg_analysis_package.time_frequency import morlet_spectrogram
@@ -999,7 +1003,7 @@ def test_pipeline_on_sample():
     """
     try:
         # Load first session
-        session_data = load_session_data('all_eeg_data.pkl', session_index=0)
+        session_data = load_session_data('../all_eeg_data.pkl', session_index=0)
         
         # Create session ID
         session_id = f"{session_data.get('rat_id', 'unknown')}_{session_data.get('session_date', 'unknown')}"

@@ -7,6 +7,11 @@ that our analysis functions produce expected results.
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+import os
+
+# Add the main directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 # Import only the modules we need (avoiding data_utils which requires h5py)
 from eeg_analysis_package.eeg_analysis import *

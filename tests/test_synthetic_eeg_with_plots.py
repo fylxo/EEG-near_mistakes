@@ -7,6 +7,12 @@ that our analysis functions produce expected results with visual verification.
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+import os
+
+# Add the main directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from eeg_analysis_package import *
 
 def generate_synthetic_eeg(duration=60, fs=200, n_channels=32, seed=42):

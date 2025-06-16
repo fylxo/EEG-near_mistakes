@@ -2,5 +2,6 @@
 /test_variability_plots
 /test_results
 /quick_test_results
+/nm_theta_results
 all_eeg_data.pkl
 

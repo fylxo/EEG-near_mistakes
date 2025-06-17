@@ -3,5 +3,7 @@
 /test_results
 /quick_test_results
 /nm_theta_results
+/nm_theta_results_roi
+/test_custom_results
 all_eeg_data.pkl
 

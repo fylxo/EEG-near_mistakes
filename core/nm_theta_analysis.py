@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 import sys
+import pandas as pd
 from typing import Dict, List, Tuple, Optional, Union
 from collections import defaultdict
 from scipy import signal
@@ -27,6 +28,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import from existing package
 from eeg_analysis_package.time_frequency import morlet_spectrogram
+from core.electrode_utils import get_channels, load_electrode_mappings
 
 
 def load_session_data(pkl_path: str, session_index: int = 0) -> Dict:
@@ -65,6 +67,101 @@ def load_session_data(pkl_path: str, session_index: int = 0) -> Dict:
             raise
 
 
+def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
+                                 roi_channels: List[int],
+                                 sfreq: float = 200.0,
+                                 freq_range: Tuple[float, float] = (3, 8),
+                                 freq_step: float = 1.0,
+                                 n_cycles_factor: float = 3.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Compute high-resolution spectrogram for ROI channels with per-channel normalization.
+    
+    Parameters:
+    -----------
+    eeg_data : np.ndarray
+        EEG data (n_channels, n_samples)
+    roi_channels : List[int]
+        List of channel indices to include in ROI
+    sfreq : float
+        Sampling frequency in Hz
+    freq_range : Tuple[float, float]
+        Frequency range (low, high) in Hz
+    freq_step : float
+        Frequency step in Hz
+    n_cycles_factor : float
+        Factor for determining number of cycles per frequency
+    
+    Returns:
+    --------
+    freqs : np.ndarray
+        Frequency vector
+    roi_power : np.ndarray
+        Average ROI power matrix (n_freqs, n_times)
+    channel_powers : np.ndarray
+        Individual channel powers (n_channels, n_freqs, n_times)
+    """
+    print(f"Computing ROI theta spectrogram for {len(roi_channels)} channels...")
+    print(f"ROI channels: {roi_channels}")
+    
+    # Create frequency vector
+    freqs = np.arange(freq_range[0], freq_range[1] + freq_step, freq_step)
+    n_cycles = np.maximum(3, freqs * n_cycles_factor)
+    
+    # Storage for individual channel spectrograms
+    channel_powers = []
+    channel_means = []
+    channel_stds = []
+    
+    # Process each channel individually
+    for i, ch_idx in enumerate(roi_channels):
+        print(f"Processing channel {ch_idx} ({i+1}/{len(roi_channels)})")
+        
+        # Extract channel data
+        eeg_channel = eeg_data[ch_idx, :]
+        
+        # Compute spectrogram for this channel
+        power_list = []
+        for j, (freq, cycles) in enumerate(zip(freqs, n_cycles)):
+            single_freq = np.array([freq])
+            _, single_power = morlet_spectrogram(
+                eeg_channel, 
+                sfreq=sfreq, 
+                freqs=single_freq, 
+                n_cycles=int(cycles)
+            )
+            power_list.append(single_power[0, :])
+        
+        channel_power = np.array(power_list)
+        
+        # Compute per-channel statistics for normalization
+        ch_mean = np.mean(channel_power, axis=1)  # Mean per frequency
+        ch_std = np.std(channel_power, axis=1)    # Std per frequency
+        ch_std = np.maximum(ch_std, 1e-12)        # Avoid division by zero
+        
+        # Z-score normalize this channel
+        normalized_power = (channel_power - ch_mean[:, np.newaxis]) / ch_std[:, np.newaxis]
+        
+        channel_powers.append(normalized_power)
+        channel_means.append(ch_mean)
+        channel_stds.append(ch_std)
+        
+        print(f"  Channel {ch_idx} power range: {channel_power.min():.2e} - {channel_power.max():.2e}")
+        print(f"  Channel {ch_idx} z-score range: {normalized_power.min():.2f} - {normalized_power.max():.2f}")
+    
+    # Convert to arrays
+    channel_powers = np.array(channel_powers)  # (n_channels, n_freqs, n_times)
+    channel_means = np.array(channel_means)    # (n_channels, n_freqs)
+    channel_stds = np.array(channel_stds)      # (n_channels, n_freqs)
+    
+    # Average across channels after normalization
+    roi_power = np.mean(channel_powers, axis=0)  # (n_freqs, n_times)
+    
+    print(f"ROI spectrogram computed. Shape: {roi_power.shape}")
+    print(f"ROI z-score range: {roi_power.min():.2f} - {roi_power.max():.2f}")
+    
+    return freqs, roi_power, channel_powers
+
+
 def compute_high_res_theta_spectrogram(eeg_data: np.ndarray, 
                                      sfreq: float = 200.0,
                                      freq_range: Tuple[float, float] = (3, 8),
@@ -72,6 +169,7 @@ def compute_high_res_theta_spectrogram(eeg_data: np.ndarray,
                                      n_cycles_factor: float = 3.0) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute high-resolution spectrogram focused on theta range (3-8 Hz).
+    [DEPRECATED: Use compute_roi_theta_spectrogram for ROI analysis]
     
     Parameters:
     -----------
@@ -488,22 +586,23 @@ def plot_nm_theta_results(normalized_windows: Dict,
     plt.show()
 
 
-def analyze_session_nm_theta(session_data: Dict,
-                           channel_of_interest: int,
-                           freq_range: Tuple[float, float] = (3, 8),
-                           freq_step: float = 1.0,
-                           window_duration: float = 1.0,
-                           n_cycles_factor: float = 3.0,
-                           save_path: str = 'nm_theta_results') -> Dict:
+def analyze_session_nm_theta_roi(session_data: Dict,
+                               roi_or_channels: Union[str, List[int]],
+                               freq_range: Tuple[float, float] = (3, 8),
+                               freq_step: float = 1.0,
+                               window_duration: float = 1.0,
+                               n_cycles_factor: float = 3.0,
+                               save_path: str = 'nm_theta_results',
+                               mapping_df: Optional[pd.DataFrame] = None) -> Dict:
     """
-    Complete NM theta analysis for a single session.
+    Complete NM theta analysis for a ROI in a single session.
     
     Parameters:
     -----------
     session_data : Dict
         Session data dictionary
-    channel_of_interest : int
-        Channel index to analyze
+    roi_or_channels : Union[str, List[int]]
+        Either ROI name (e.g., 'frontal', 'hippocampus') or list of channel indices
     freq_range : Tuple[float, float]
         Frequency range for analysis (default: 3-8 Hz)
     freq_step : float
@@ -514,6 +613,8 @@ def analyze_session_nm_theta(session_data: Dict,
         Factor for adaptive n_cycles (default: 3.0)
     save_path : str
         Directory to save results
+    mapping_df : Optional[pd.DataFrame]
+        Electrode mapping dataframe. If None, loads from default CSV
     
     Returns:
     --------
@@ -521,39 +622,59 @@ def analyze_session_nm_theta(session_data: Dict,
         Complete analysis results
     """
     print("=" * 60)
-    print("NM THETA OSCILLATION ANALYSIS")
+    print("NM THETA ROI ANALYSIS")
     print("=" * 60)
-    
-    # Validate inputs
-    if channel_of_interest >= session_data['eeg'].shape[0]:
-        raise ValueError(f"Channel {channel_of_interest} not available. Max channel: {session_data['eeg'].shape[0]-1}")
     
     if len(session_data['nm_peak_times']) == 0:
         raise ValueError("No NM events found in session")
     
-    # Step 1: Extract channel data
-    print(f"Step 1: Analyzing channel {channel_of_interest}")
-    eeg_channel = session_data['eeg'][channel_of_interest, :]
+    # Step 1: Get ROI channel indices
+    print(f"Step 1: Determining ROI channels")
+    rat_id = session_data.get('rat_id', 'unknown')
+    
+    if isinstance(roi_or_channels, str):
+        # ROI name provided - need to map to channel indices
+        if mapping_df is None:
+            mapping_df = load_electrode_mappings()
+        roi_channels = get_channels(rat_id, roi_or_channels, mapping_df)
+        print(f"ROI '{roi_or_channels}' for rat {rat_id} -> channels: {roi_channels}")
+    else:
+        # Direct channel indices provided
+        roi_channels = list(roi_or_channels)
+        print(f"Using provided channel indices: {roi_channels}")
+    
+    # Validate channel indices
+    max_channel = session_data['eeg'].shape[0] - 1
+    invalid_channels = [ch for ch in roi_channels if ch > max_channel or ch < 0]
+    if invalid_channels:
+        raise ValueError(f"Invalid channel indices {invalid_channels}. Valid range: 0-{max_channel}")
+    
+    if not roi_channels:
+        raise ValueError("No valid channels found for ROI")
+    
     times = session_data['eeg_time'].flatten()
     
-    # Step 2: Compute high-resolution theta spectrogram
-    print(f"Step 2: Computing theta spectrogram ({freq_range[0]}-{freq_range[1]} Hz)")
-    freqs, power = compute_high_res_theta_spectrogram(
-        eeg_channel, 
+    # Step 2: Compute ROI theta spectrogram
+    print(f"Step 2: Computing ROI theta spectrogram ({freq_range[0]}-{freq_range[1]} Hz)")
+    freqs, roi_power, channel_powers = compute_roi_theta_spectrogram(
+        session_data['eeg'],
+        roi_channels,
         sfreq=200.0,
         freq_range=freq_range,
         freq_step=freq_step,
         n_cycles_factor=n_cycles_factor
     )
     
-    # Step 3: Compute global statistics
-    print("Step 3: Computing global normalization statistics")
-    global_mean, global_std = compute_global_statistics(power)
+    # Step 3: ROI power is already normalized per channel, no global stats needed
+    print("Step 3: Using per-channel normalized ROI power")
+    # For compatibility with existing functions, create dummy global stats
+    global_mean = np.zeros(len(freqs))
+    global_std = np.ones(len(freqs))
     
-    # Step 4: Extract NM event windows
+    # Step 4: Extract NM event windows from ROI power
     print("Step 4: Extracting NM event windows")
     nm_windows = extract_nm_event_windows(
-        power, times, 
+        roi_power, times, 
         session_data['nm_peak_times'],
         session_data['nm_sizes'],
         window_duration
@@ -562,38 +683,234 @@ def analyze_session_nm_theta(session_data: Dict,
     if not nm_windows:
         raise ValueError("No valid NM event windows extracted")
     
-    # Step 5: Normalize windows
-    print("Step 5: Z-score normalizing windows")
-    normalized_windows = normalize_windows(nm_windows, global_mean, global_std)
+    # Step 5: Since ROI power is already normalized, we skip additional normalization
+    print("Step 5: ROI windows already normalized per channel")
+    # For compatibility, use the windows as "normalized"
+    normalized_windows = nm_windows
     
     # Step 6: Save results
     print("Step 6: Saving results")
-    save_results(
+    save_roi_results(
         session_data, normalized_windows, freqs, 
-        global_mean, global_std, channel_of_interest, save_path
+        roi_channels, roi_or_channels, channel_powers, save_path
     )
     
     # Step 7: Generate plots
     print("Step 7: Generating plots")
-    plot_nm_theta_results(normalized_windows, freqs, save_path)
+    plot_roi_theta_results(normalized_windows, freqs, roi_channels, save_path)
     
     print("=" * 60)
-    print("ANALYSIS COMPLETE!")
+    print("ROI ANALYSIS COMPLETE!")
     print("=" * 60)
     
     return {
         'freqs': freqs,
-        'power': power,
-        'global_mean': global_mean,
-        'global_std': global_std,
+        'roi_power': roi_power,
+        'channel_powers': channel_powers,
+        'roi_channels': roi_channels,
         'normalized_windows': normalized_windows,
-        'channel_analyzed': channel_of_interest
+        'roi_specification': roi_or_channels
     }
+
+
+def save_roi_results(session_data: Dict,
+                   normalized_windows: Dict,
+                   freqs: np.ndarray,
+                   roi_channels: List[int],
+                   roi_specification: Union[str, List[int]],
+                   channel_powers: np.ndarray,
+                   save_path: str):
+    """
+    Save the ROI analysis results with metadata.
+    """
+    os.makedirs(save_path, exist_ok=True)
+    
+    # Prepare results dictionary
+    results = {
+        'session_metadata': {
+            'rat_id': session_data.get('rat_id', 'unknown'),
+            'session_date': session_data.get('session_date', 'unknown'),
+            'eeg_shape': session_data['eeg'].shape,
+            'roi_specification': roi_specification,
+            'roi_channels': roi_channels,
+            'n_roi_channels': len(roi_channels),
+            'total_nm_events': len(session_data['nm_peak_times']),
+            'nm_sizes_available': np.unique(session_data['nm_sizes']).tolist()
+        },
+        'analysis_parameters': {
+            'frequency_range': (freqs[0], freqs[-1]),
+            'frequency_step': freqs[1] - freqs[0] if len(freqs) > 1 else 1.0,
+            'n_frequencies': len(freqs),
+            'window_duration': (normalized_windows[list(normalized_windows.keys())[0]]['window_times'][-1] - 
+                              normalized_windows[list(normalized_windows.keys())[0]]['window_times'][0]) if normalized_windows else 1.0,
+            'normalization': 'per-channel z-score, then averaged across ROI channels'
+        },
+        'frequencies': freqs,
+        'roi_data': {
+            'channels': roi_channels,
+            'specification': roi_specification,
+            'channel_powers': channel_powers  # Individual channel powers for SEM computation
+        },
+        'nm_windows': normalized_windows
+    }
+    
+    # Save main results
+    results_file = os.path.join(save_path, 'nm_roi_theta_analysis_results.pkl')
+    with open(results_file, 'wb') as f:
+        pickle.dump(results, f)
+    
+    # Save summary
+    summary = {
+        'session': f"{results['session_metadata']['rat_id']}_{results['session_metadata']['session_date']}",
+        'roi_specification': roi_specification,
+        'roi_channels': roi_channels,
+        'n_channels': len(roi_channels),
+        'frequency_range': f"{freqs[0]:.1f}-{freqs[-1]:.1f} Hz",
+        'nm_sizes_analyzed': list(normalized_windows.keys()),
+        'events_per_size': {size: data['n_events'] for size, data in normalized_windows.items()},
+        'total_events_analyzed': sum(data['n_events'] for data in normalized_windows.values())
+    }
+    
+    summary_file = os.path.join(save_path, 'roi_analysis_summary.txt')
+    with open(summary_file, 'w') as f:
+        f.write("NM ROI Theta Analysis Summary\n")
+        f.write("=" * 35 + "\n")
+        for key, value in summary.items():
+            f.write(f"{key}: {value}\n")
+    
+    print(f"ROI results saved to {save_path}")
+    print(f"Main results: {results_file}")
+    print(f"Summary: {summary_file}")
+
+
+def plot_roi_theta_results(normalized_windows: Dict,
+                         freqs: np.ndarray,
+                         roi_channels: List[int],
+                         save_path: str = None):
+    """
+    Plot average z-scored spectrograms for each NM size (ROI version).
+    """
+    print("Generating ROI plots...")
+    
+    nm_sizes = sorted(normalized_windows.keys())
+    n_sizes = len(nm_sizes)
+    
+    if n_sizes == 0:
+        print("No NM windows to plot!")
+        return
+    
+    # Create figure with subplots for each NM size
+    fig, axes = plt.subplots(1, n_sizes, figsize=(5*n_sizes, 6))
+    if n_sizes == 1:
+        axes = [axes]
+    
+    fig.suptitle(f'Average Z-scored Theta Oscillations Around NM Events\nROI: {len(roi_channels)} channels {roi_channels}', 
+                 fontsize=16, fontweight='bold')
+    
+    # Color map and normalization for consistent scaling
+    vmin = min(np.mean(data['windows'], axis=0).min() for data in normalized_windows.values())
+    vmax = max(np.mean(data['windows'], axis=0).max() for data in normalized_windows.values())
+    
+    for i, size in enumerate(nm_sizes):
+        data = normalized_windows[size]
+        
+        # Compute average across events
+        avg_spectrogram = np.mean(data['windows'], axis=0)  # (n_freqs, n_times)
+        window_times = data['window_times']
+        n_events = data['n_events']
+        
+        # Plot heatmap
+        im = axes[i].pcolormesh(
+            window_times, freqs, avg_spectrogram,
+            shading='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax
+        )
+        
+        # Add event line
+        axes[i].axvline(0, color='black', linestyle='--', linewidth=2, alpha=0.8)
+        
+        # Formatting
+        axes[i].set_title(f'NM Size {size}\n(n={n_events} events)', 
+                         fontsize=14, fontweight='bold')
+        axes[i].set_xlabel('Time (s)', fontsize=12)
+        if i == 0:
+            axes[i].set_ylabel('Frequency (Hz)', fontsize=12)
+        axes[i].grid(True, alpha=0.3)
+        
+        # Add colorbar
+        cbar = plt.colorbar(im, ax=axes[i])
+        cbar.set_label('Z-score', fontsize=10)
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plot_file = os.path.join(save_path, 'nm_roi_theta_spectrograms.png')
+        plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+        print(f"ROI plot saved: {plot_file}")
+    
+    plt.show()
+    
+    # Additional plot: Frequency profiles at event time
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    
+    # Find time index closest to event (t=0)
+    for size in nm_sizes:
+        data = normalized_windows[size]
+        window_times = data['window_times']
+        event_idx = np.argmin(np.abs(window_times))
+        
+        avg_spectrogram = np.mean(data['windows'], axis=0)
+        freq_profile = avg_spectrogram[:, event_idx]
+        
+        ax.plot(freqs, freq_profile, 'o-', linewidth=2, markersize=6,
+                label=f'NM Size {size} (n={data["n_events"]})', alpha=0.8)
+    
+    ax.axhline(0, color='black', linestyle='--', alpha=0.5)
+    ax.set_xlabel('Frequency (Hz)', fontsize=12)
+    ax.set_ylabel('Z-score at Event Time', fontsize=12)
+    ax.set_title(f'ROI Frequency Profiles at NM Event Time (t=0)\nChannels: {roi_channels}', 
+                 fontsize=14, fontweight='bold')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    if save_path:
+        profile_file = os.path.join(save_path, 'nm_roi_frequency_profiles.png')
+        plt.savefig(profile_file, dpi=300, bbox_inches='tight')
+        print(f"ROI frequency profile plot saved: {profile_file}")
+    
+    plt.show()
+
+
+# Keep the original single-channel function for backward compatibility
+def analyze_session_nm_theta(session_data: Dict,
+                           channel_of_interest: int,
+                           freq_range: Tuple[float, float] = (3, 8),
+                           freq_step: float = 1.0,
+                           window_duration: float = 1.0,
+                           n_cycles_factor: float = 3.0,
+                           save_path: str = 'nm_theta_results') -> Dict:
+    """
+    Complete NM theta analysis for a single session (single channel - DEPRECATED).
+    Use analyze_session_nm_theta_roi for ROI-based analysis.
+    """
+    print("WARNING: Using deprecated single-channel analysis. Consider using analyze_session_nm_theta_roi instead.")
+    
+    # Convert single channel to channel list and use ROI function
+    return analyze_session_nm_theta_roi(
+        session_data=session_data,
+        roi_or_channels=[channel_of_interest],
+        freq_range=freq_range,
+        freq_step=freq_step,
+        window_duration=window_duration,
+        n_cycles_factor=n_cycles_factor,
+        save_path=save_path
+    )
 
 
 def main():
     """
-    Main function to run NM theta analysis on a sample session.
+    Main function to run NM ROI theta analysis on a sample session.
     """
     try:
         # Load session data
@@ -601,26 +918,28 @@ def main():
         session_data = load_session_data('all_eeg_data.pkl', session_index=0)
         
         # Analysis parameters
-        channel_of_interest = 1  # Analyze first channel
-        freq_range = (2, 10)      # Theta range
-        freq_step = 0.125         # 1 Hz resolution
-        window_duration = 1.0    # ±0.5s around events
-        n_cycles_factor = 3.0    # For good frequency resolution
+        roi_specification = 'hippocampus'
+        freq_range = (2, 10)       # Extended theta range
+        freq_step = 0.125            # 0.5 Hz resolution
+        window_duration = 1.0      # ±0.5s around events
+        n_cycles_factor = 3.0      # For good frequency resolution
         
-        # Run analysis
-        results = analyze_session_nm_theta(
+        # Run ROI analysis
+        results = analyze_session_nm_theta_roi(
             session_data=session_data,
-            channel_of_interest=channel_of_interest,
+            roi_or_channels=roi_specification,
             freq_range=freq_range,
             freq_step=freq_step,
             window_duration=window_duration,
             n_cycles_factor=n_cycles_factor,
-            save_path='nm_theta_results'
+            save_path='nm_roi_theta_results'
         )
         
         # Print summary
-        print("\nAnalysis Summary:")
-        print(f"- Channel analyzed: {channel_of_interest}")
+        print("\nROI Analysis Summary:")
+        print(f"- ROI specification: {roi_specification}")
+        print(f"- ROI channels: {results['roi_channels']}")
+        print(f"- Number of channels: {len(results['roi_channels'])}")
         print(f"- Frequency range: {freq_range[0]}-{freq_range[1]} Hz")
         print(f"- NM sizes found: {list(results['normalized_windows'].keys())}")
         print(f"- Total events analyzed: {sum(data['n_events'] for data in results['normalized_windows'].values())}")

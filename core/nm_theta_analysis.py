@@ -512,9 +512,13 @@ def plot_nm_theta_results(normalized_windows: Dict,
     fig.suptitle('Average Z-scored Theta Oscillations Around NM Events', 
                  fontsize=16, fontweight='bold')
     
-    # Color map and normalization for consistent scaling (moved after empty check)
-    vmin = min(np.mean(data['windows'], axis=0).min() for data in normalized_windows.values())
-    vmax = max(np.mean(data['windows'], axis=0).max() for data in normalized_windows.values())
+    # Color map and normalization for consistent scaling, centered at 0
+    all_spectrograms = [np.mean(data['windows'], axis=0) for data in normalized_windows.values()]
+    vmin = min(spec.min() for spec in all_spectrograms)
+    vmax = max(spec.max() for spec in all_spectrograms)
+    # Center colormap at 0
+    vmax_abs = max(abs(vmin), abs(vmax))
+    vmin, vmax = -vmax_abs, vmax_abs
     
     for i, size in enumerate(nm_sizes):
         data = normalized_windows[size]
@@ -524,7 +528,7 @@ def plot_nm_theta_results(normalized_windows: Dict,
         window_times = data['window_times']
         n_events = data['n_events']
         
-        # Plot heatmap
+        # Plot heatmap with diverging colormap centered at 0
         im = axes[i].pcolormesh(
             window_times, freqs, avg_spectrogram,
             shading='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax
@@ -593,7 +597,8 @@ def analyze_session_nm_theta_roi(session_data: Dict,
                                window_duration: float = 1.0,
                                n_cycles_factor: float = 3.0,
                                save_path: str = 'nm_theta_results',
-                               mapping_df: Optional[pd.DataFrame] = None) -> Dict:
+                               mapping_df: Optional[pd.DataFrame] = None,
+                               show_plots: bool = True) -> Dict:
     """
     Complete NM theta analysis for a ROI in a single session.
     
@@ -602,7 +607,7 @@ def analyze_session_nm_theta_roi(session_data: Dict,
     session_data : Dict
         Session data dictionary
     roi_or_channels : Union[str, List[int]]
-        Either ROI name (e.g., 'frontal', 'hippocampus') or list of channel indices
+        Either ROI name (e.g., 'frontal', 'hippocampus') or list of channel numbers (1-32, as in electrode mappings)
     freq_range : Tuple[float, float]
         Frequency range for analysis (default: 3-8 Hz)
     freq_step : float
@@ -615,6 +620,8 @@ def analyze_session_nm_theta_roi(session_data: Dict,
         Directory to save results
     mapping_df : Optional[pd.DataFrame]
         Electrode mapping dataframe. If None, loads from default CSV
+    show_plots : bool
+        Whether to display plots (default: True)
     
     Returns:
     --------
@@ -632,16 +639,16 @@ def analyze_session_nm_theta_roi(session_data: Dict,
     print(f"Step 1: Determining ROI channels")
     rat_id = session_data.get('rat_id', 'unknown')
     
+    # Always use get_channels for proper 1-32 to 0-31 conversion
+    if mapping_df is None:
+        mapping_df = load_electrode_mappings()
+    
+    roi_channels = get_channels(rat_id, roi_or_channels, mapping_df)
+    
     if isinstance(roi_or_channels, str):
-        # ROI name provided - need to map to channel indices
-        if mapping_df is None:
-            mapping_df = load_electrode_mappings()
-        roi_channels = get_channels(rat_id, roi_or_channels, mapping_df)
-        print(f"ROI '{roi_or_channels}' for rat {rat_id} -> channels: {roi_channels}")
+        print(f"ROI '{roi_or_channels}' for rat {rat_id} -> indices: {roi_channels}")
     else:
-        # Direct channel indices provided
-        roi_channels = list(roi_or_channels)
-        print(f"Using provided channel indices: {roi_channels}")
+        print(f"Channel numbers {roi_or_channels} for rat {rat_id} -> indices: {roi_channels}")
     
     # Validate channel indices
     max_channel = session_data['eeg'].shape[0] - 1
@@ -696,8 +703,11 @@ def analyze_session_nm_theta_roi(session_data: Dict,
     )
     
     # Step 7: Generate plots
-    print("Step 7: Generating plots")
-    plot_roi_theta_results(normalized_windows, freqs, roi_channels, save_path)
+    if show_plots:
+        print("Step 7: Generating plots")
+        plot_roi_theta_results(normalized_windows, freqs, roi_channels, save_path)
+    else:
+        print("Step 7: Skipping plots (show_plots=False)")
     
     print("=" * 60)
     print("ROI ANALYSIS COMPLETE!")
@@ -807,9 +817,13 @@ def plot_roi_theta_results(normalized_windows: Dict,
     fig.suptitle(f'Average Z-scored Theta Oscillations Around NM Events\nROI: {len(roi_channels)} channels {roi_channels}', 
                  fontsize=16, fontweight='bold')
     
-    # Color map and normalization for consistent scaling
-    vmin = min(np.mean(data['windows'], axis=0).min() for data in normalized_windows.values())
-    vmax = max(np.mean(data['windows'], axis=0).max() for data in normalized_windows.values())
+    # Color map and normalization for consistent scaling, centered at 0
+    all_spectrograms = [np.mean(data['windows'], axis=0) for data in normalized_windows.values()]
+    vmin = min(spec.min() for spec in all_spectrograms)
+    vmax = max(spec.max() for spec in all_spectrograms)
+    # Center colormap at 0
+    vmax_abs = max(abs(vmin), abs(vmax))
+    vmin, vmax = -vmax_abs, vmax_abs
     
     for i, size in enumerate(nm_sizes):
         data = normalized_windows[size]
@@ -819,7 +833,7 @@ def plot_roi_theta_results(normalized_windows: Dict,
         window_times = data['window_times']
         n_events = data['n_events']
         
-        # Plot heatmap
+        # Plot heatmap with diverging colormap centered at 0
         im = axes[i].pcolormesh(
             window_times, freqs, avg_spectrogram,
             shading='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax
@@ -889,7 +903,8 @@ def analyze_session_nm_theta(session_data: Dict,
                            freq_step: float = 1.0,
                            window_duration: float = 1.0,
                            n_cycles_factor: float = 3.0,
-                           save_path: str = 'nm_theta_results') -> Dict:
+                           save_path: str = 'nm_theta_results',
+                           show_plots: bool = True) -> Dict:
     """
     Complete NM theta analysis for a single session (single channel - DEPRECATED).
     Use analyze_session_nm_theta_roi for ROI-based analysis.
@@ -904,7 +919,8 @@ def analyze_session_nm_theta(session_data: Dict,
         freq_step=freq_step,
         window_duration=window_duration,
         n_cycles_factor=n_cycles_factor,
-        save_path=save_path
+        save_path=save_path,
+        show_plots=show_plots
     )
 
 
@@ -918,7 +934,7 @@ def main():
         session_data = load_session_data('all_eeg_data.pkl', session_index=0)
         
         # Analysis parameters
-        roi_specification = 'hippocampus'
+        roi_specification = 'frontal'
         freq_range = (2, 10)       # Extended theta range
         freq_step = 0.125            # 0.5 Hz resolution
         window_duration = 1.0      # ±0.5s around events
@@ -927,7 +943,7 @@ def main():
         # Run ROI analysis
         results = analyze_session_nm_theta_roi(
             session_data=session_data,
-            roi_or_channels=roi_specification,
+            roi_or_channels=roi_specification, #or just a list of channel numbers like [10, 11, 12]
             freq_range=freq_range,
             freq_step=freq_step,
             window_duration=window_duration,

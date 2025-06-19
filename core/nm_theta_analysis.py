@@ -28,7 +28,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import from existing package
 from eeg_analysis_package.time_frequency import morlet_spectrogram
-from core.electrode_utils import get_channels, load_electrode_mappings
+from core.electrode_utils import get_channels, load_electrode_mappings, ROI_MAP
 
 
 def load_session_data(pkl_path: str, session_index: int = 0) -> Dict:
@@ -102,6 +102,12 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
     """
     print(f"Computing ROI theta spectrogram for {len(roi_channels)} channels...")
     print(f"ROI channels: {roi_channels}")
+    
+    # Additional verification for the channels being processed
+    print(f"📊 PROCESSING VERIFICATION:")
+    print(f"   Using {len(roi_channels)} channels: {sorted(roi_channels)}")
+    print(f"   EEG data shape: {eeg_data.shape}")
+    print(f"   Each channel will be z-score normalized individually, then averaged")
     
     # Create frequency vector
     freqs = np.arange(freq_range[0], freq_range[1] + freq_step, freq_step)
@@ -645,10 +651,44 @@ def analyze_session_nm_theta_roi(session_data: Dict,
     
     roi_channels = get_channels(rat_id, roi_or_channels, mapping_df)
     
+    # MAPPING VERIFICATION OUTPUTS
+    print("=" * 60)
+    print("🔍 ELECTRODE MAPPING VERIFICATION")
+    print("=" * 60)
+    
     if isinstance(roi_or_channels, str):
-        print(f"ROI '{roi_or_channels}' for rat {rat_id} -> indices: {roi_channels}")
+        # Show the complete mapping chain for ROI
+        electrode_numbers = ROI_MAP.get(roi_or_channels, [])
+        print(f"✓ ROI specification: '{roi_or_channels}'")
+        print(f"✓ ROI_MAP['{roi_or_channels}'] = {electrode_numbers}")
+        print(f"✓ Rat {rat_id} electrode mapping:")
+        
+        # Show which electrodes map to which channels
+        # Handle rat_id type conversion (same logic as in electrode_utils.py)
+        lookup_rat_id = rat_id
+        if rat_id not in mapping_df.index:
+            # Try converting to int if it's a string
+            if isinstance(rat_id, str) and rat_id.isdigit():
+                lookup_rat_id = int(rat_id)
+            # Try converting to string if it's an int  
+            elif isinstance(rat_id, int):
+                rat_id_str = str(rat_id)
+                if rat_id_str in mapping_df.index:
+                    lookup_rat_id = rat_id_str
+        
+        rat_mapping = mapping_df.loc[lookup_rat_id].values
+        for electrode in electrode_numbers:
+            channel_idx = np.where(rat_mapping == electrode)[0]
+            if len(channel_idx) > 0:
+                print(f"   Electrode {electrode:2d} -> Channel index {channel_idx[0]:2d}")
+        
+        print(f"✓ Final channel indices: {sorted(roi_channels)}")
+        print(f"✓ EEG data access: eeg_data[{sorted(roi_channels)}, :]")
     else:
-        print(f"Channel numbers {roi_or_channels} for rat {rat_id} -> indices: {roi_channels}")
+        print(f"✓ Custom channel specification: {roi_or_channels}")
+        print(f"✓ Resulting channel indices: {sorted(roi_channels)}")
+    
+    print("=" * 60)
     
     # Validate channel indices
     max_channel = session_data['eeg'].shape[0] - 1

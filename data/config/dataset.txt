@@ -1,0 +1,13 @@
+there are 306 files for each session (ratID_SessionDate.mat)
+each file has a cell array (Data_eeg) with 10 columns:
+column 1 - Rat ID
+column 2 - Session date
+column 3 - 32 channels EEG, filtered(lowpass at 45Hz), dowsampled to 200Hz
+column 4 - EEG time array aligned to 0 sec start time (only from 1 one the channels is enough)
+column 5 - Velocity trace for entire session
+column 6 - Velocity time array
+column 7 - NM peak velocity times
+column 8 - NM sizes (1,2,3)
+column 9 - ITI peak velocity times
+column 10 - ITI peak velocity sizes (1,2,3)
+columns 8 and 10 have 1,2,3 which tell the size of the NM and the ITI-matched NM respectively

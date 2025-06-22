@@ -90,11 +90,11 @@ def batch_process_files(mat_dir):
 
     return all_data
 
-def save_data(all_data, filename='all_eeg_data.pkl'):
+def save_data(all_data, filename='data/processed/all_eeg_data.pkl'):
     with open(filename, 'wb') as f:
         pickle.dump(all_data, f)
         
-def load_data(filename='all_eeg_data.pkl'):
+def load_data(filename='data/processed/all_eeg_data.pkl'):
     with open(filename, 'rb') as f:
         all_data = pickle.load(f)
     return all_data

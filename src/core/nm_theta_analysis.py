@@ -28,7 +28,54 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import from existing package
 from eeg_analysis_package.time_frequency import morlet_spectrogram
-from core.electrode_utils import get_channels, load_electrode_mappings, ROI_MAP
+from electrode_utils import get_channels, load_electrode_mappings, ROI_MAP
+
+
+def get_electrode_numbers_from_channels(rat_id: Union[str, int], 
+                                       channel_indices: List[int], 
+                                       mapping_df: pd.DataFrame) -> List[int]:
+    """
+    Convert channel indices back to electrode numbers for display purposes.
+    
+    Parameters:
+    -----------
+    rat_id : Union[str, int]
+        Rat identifier
+    channel_indices : List[int]
+        0-based channel indices
+    mapping_df : pd.DataFrame
+        Electrode mapping dataframe
+    
+    Returns:
+    --------
+    electrode_numbers : List[int]
+        Electrode numbers (1-32) corresponding to the channel indices
+    """
+    # Handle rat_id type conversion (same logic as in electrode_utils.py)
+    str_id = str(rat_id)
+    int_id = int(rat_id) if isinstance(rat_id, (str, int)) and str(rat_id).isdigit() else None
+
+    if rat_id in mapping_df.index:
+        row = mapping_df.loc[rat_id].values
+    elif str_id in mapping_df.index:
+        row = mapping_df.loc[str_id].values
+    elif int_id is not None and int_id in mapping_df.index:
+        row = mapping_df.loc[int_id].values
+    else:
+        raise ValueError(f"Rat ID {rat_id} not found in mapping DataFrame")
+
+    # Remove NaN values and convert to integers
+    row = row[~pd.isna(row)].astype(int)
+    
+    # Get electrode numbers for the given channel indices
+    electrode_numbers = []
+    for ch_idx in channel_indices:
+        if ch_idx < len(row):
+            electrode_numbers.append(row[ch_idx])
+        else:
+            electrode_numbers.append(f"Ch{ch_idx}")  # Fallback for out-of-range channels
+    
+    return electrode_numbers
 
 
 def load_session_data(pkl_path: str, session_index: int = 0) -> Dict:
@@ -71,7 +118,7 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
                                  roi_channels: List[int],
                                  sfreq: float = 200.0,
                                  freq_range: Tuple[float, float] = (3, 8),
-                                 freq_step: float = 1.0,
+                                 n_freqs: int = 20,
                                  n_cycles_factor: float = 3.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Compute high-resolution spectrogram for ROI channels with per-channel normalization.
@@ -86,8 +133,8 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
         Sampling frequency in Hz
     freq_range : Tuple[float, float]
         Frequency range (low, high) in Hz
-    freq_step : float
-        Frequency step in Hz
+    n_freqs : int
+        Number of logarithmically spaced frequencies (default: 20)
     n_cycles_factor : float
         Factor for determining number of cycles per frequency
     
@@ -109,9 +156,15 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
     print(f"   EEG data shape: {eeg_data.shape}")
     print(f"   Each channel will be z-score normalized individually, then averaged")
     
-    # Create frequency vector
-    freqs = np.arange(freq_range[0], freq_range[1] + freq_step, freq_step)
+    # Create logarithmically spaced frequency vector
+    freqs = np.geomspace(freq_range[0], freq_range[1], n_freqs)
     n_cycles = np.maximum(3, freqs * n_cycles_factor)
+    
+    # Print exact frequencies being used
+    print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
+    print(f"   Range: {freq_range[0]:.2f} - {freq_range[1]:.2f} Hz")
+    print(f"   Frequencies: {[f'{f:.2f}' for f in freqs]}")
+    print(f"   N-cycles: {[f'{nc:.1f}' for nc in n_cycles]}")
     
     # Storage for individual channel spectrograms
     channel_powers = []
@@ -171,7 +224,7 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
 def compute_high_res_theta_spectrogram(eeg_data: np.ndarray, 
                                      sfreq: float = 200.0,
                                      freq_range: Tuple[float, float] = (3, 8),
-                                     freq_step: float = 1.0,
+                                     n_freqs: int = 20,
                                      n_cycles_factor: float = 3.0) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute high-resolution spectrogram focused on theta range (3-8 Hz).
@@ -185,8 +238,8 @@ def compute_high_res_theta_spectrogram(eeg_data: np.ndarray,
         Sampling frequency in Hz
     freq_range : Tuple[float, float]
         Frequency range (low, high) in Hz
-    freq_step : float
-        Frequency step in Hz
+    n_freqs : int
+        Number of logarithmically spaced frequencies (default: 20)
     n_cycles_factor : float
         Factor for determining number of cycles per frequency (higher = better freq resolution)
     
@@ -197,17 +250,18 @@ def compute_high_res_theta_spectrogram(eeg_data: np.ndarray,
     power : np.ndarray
         Time-frequency power matrix (n_freqs, n_times)
     """
-    # Create frequency vector with specified resolution
-    freqs = np.arange(freq_range[0], freq_range[1] + freq_step, freq_step)
+    # Create logarithmically spaced frequency vector
+    freqs = np.geomspace(freq_range[0], freq_range[1], n_freqs)
     
     # For low frequencies, use more cycles for better frequency resolution
     # Use adaptive n_cycles: more cycles for lower frequencies
     n_cycles = np.maximum(3, freqs * n_cycles_factor)
     
     print(f"Computing high-resolution theta spectrogram...")
-    print(f"Frequency range: {freq_range[0]}-{freq_range[1]} Hz, step: {freq_step} Hz")
-    print(f"Number of frequencies: {len(freqs)}")
-    print(f"Cycles per frequency: {n_cycles}")
+    print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
+    print(f"   Range: {freq_range[0]:.2f} - {freq_range[1]:.2f} Hz")
+    print(f"   Frequencies: {[f'{f:.2f}' for f in freqs]}")
+    print(f"   N-cycles: {[f'{nc:.1f}' for nc in n_cycles]}")
     
     # Compute Morlet spectrogram with adaptive cycles
     try:
@@ -599,12 +653,13 @@ def plot_nm_theta_results(normalized_windows: Dict,
 def analyze_session_nm_theta_roi(session_data: Dict,
                                roi_or_channels: Union[str, List[int]],
                                freq_range: Tuple[float, float] = (3, 8),
-                               freq_step: float = 1.0,
+                               n_freqs: int = 20,
                                window_duration: float = 1.0,
                                n_cycles_factor: float = 3.0,
                                save_path: str = 'nm_theta_results',
                                mapping_df: Optional[pd.DataFrame] = None,
-                               show_plots: bool = True) -> Dict:
+                               show_plots: bool = True,
+                               show_frequency_profiles: bool = False) -> Dict:
     """
     Complete NM theta analysis for a ROI in a single session.
     
@@ -616,8 +671,8 @@ def analyze_session_nm_theta_roi(session_data: Dict,
         Either ROI name (e.g., 'frontal', 'hippocampus') or list of channel numbers (1-32, as in electrode mappings)
     freq_range : Tuple[float, float]
         Frequency range for analysis (default: 3-8 Hz)
-    freq_step : float
-        Frequency resolution (default: 1 Hz)
+    n_freqs : int
+        Number of logarithmically spaced frequencies (default: 20)
     window_duration : float
         Event window duration (default: 1.0s = ±0.5s)
     n_cycles_factor : float
@@ -628,6 +683,8 @@ def analyze_session_nm_theta_roi(session_data: Dict,
         Electrode mapping dataframe. If None, loads from default CSV
     show_plots : bool
         Whether to display plots (default: True)
+    show_frequency_profiles : bool
+        Whether to display ROI frequency profiles plot (default: False)
     
     Returns:
     --------
@@ -708,7 +765,7 @@ def analyze_session_nm_theta_roi(session_data: Dict,
         roi_channels,
         sfreq=200.0,
         freq_range=freq_range,
-        freq_step=freq_step,
+        n_freqs=n_freqs,
         n_cycles_factor=n_cycles_factor
     )
     
@@ -745,7 +802,15 @@ def analyze_session_nm_theta_roi(session_data: Dict,
     # Step 7: Generate plots
     if show_plots:
         print("Step 7: Generating plots")
-        plot_roi_theta_results(normalized_windows, freqs, roi_channels, save_path)
+        plot_roi_theta_results(
+            normalized_windows, 
+            freqs, 
+            roi_channels, 
+            save_path, 
+            rat_id=rat_id, 
+            mapping_df=mapping_df,
+            show_frequency_profiles=show_frequency_profiles
+        )
     else:
         print("Step 7: Skipping plots (show_plots=False)")
     
@@ -836,7 +901,10 @@ def save_roi_results(session_data: Dict,
 def plot_roi_theta_results(normalized_windows: Dict,
                          freqs: np.ndarray,
                          roi_channels: List[int],
-                         save_path: str = None):
+                         save_path: str = None,
+                         rat_id: Union[str, int] = None,
+                         mapping_df: pd.DataFrame = None,
+                         show_frequency_profiles: bool = False):
     """
     Plot average z-scored spectrograms for each NM size (ROI version).
     """
@@ -854,7 +922,20 @@ def plot_roi_theta_results(normalized_windows: Dict,
     if n_sizes == 1:
         axes = [axes]
     
-    fig.suptitle(f'Average Z-scored Theta Oscillations Around NM Events\nROI: {len(roi_channels)} channels {roi_channels}', 
+    # Get electrode numbers for display
+    electrode_display = roi_channels  # Default to channel indices
+    if rat_id is not None and mapping_df is not None:
+        try:
+            electrode_numbers = get_electrode_numbers_from_channels(rat_id, roi_channels, mapping_df)
+            electrode_display = electrode_numbers
+            electrode_label = "electrodes"
+        except Exception as e:
+            print(f"Warning: Could not convert channels to electrodes: {e}")
+            electrode_label = "channels"
+    else:
+        electrode_label = "channels"
+    
+    fig.suptitle(f'Average Z-scored Theta Oscillations Around NM Events\nROI: {len(roi_channels)} {electrode_label} {electrode_display}', 
                  fontsize=16, fontweight='bold')
     
     # Color map and normalization for consistent scaling, centered at 0
@@ -903,37 +984,41 @@ def plot_roi_theta_results(normalized_windows: Dict,
     
     plt.show()
     
-    # Additional plot: Frequency profiles at event time
-    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-    
-    # Find time index closest to event (t=0)
-    for size in nm_sizes:
-        data = normalized_windows[size]
-        window_times = data['window_times']
-        event_idx = np.argmin(np.abs(window_times))
+    # Additional plot: Frequency profiles at event time (optional)
+    if show_frequency_profiles:
+        print("Generating frequency profiles plot...")
+        fig, ax = plt.subplots(1, 1, figsize=(10, 6))
         
-        avg_spectrogram = np.mean(data['windows'], axis=0)
-        freq_profile = avg_spectrogram[:, event_idx]
+        # Find time index closest to event (t=0)
+        for size in nm_sizes:
+            data = normalized_windows[size]
+            window_times = data['window_times']
+            event_idx = np.argmin(np.abs(window_times))
+            
+            avg_spectrogram = np.mean(data['windows'], axis=0)
+            freq_profile = avg_spectrogram[:, event_idx]
+            
+            ax.plot(freqs, freq_profile, 'o-', linewidth=2, markersize=6,
+                    label=f'NM Size {size} (n={data["n_events"]})', alpha=0.8)
         
-        ax.plot(freqs, freq_profile, 'o-', linewidth=2, markersize=6,
-                label=f'NM Size {size} (n={data["n_events"]})', alpha=0.8)
-    
-    ax.axhline(0, color='black', linestyle='--', alpha=0.5)
-    ax.set_xlabel('Frequency (Hz)', fontsize=12)
-    ax.set_ylabel('Z-score at Event Time', fontsize=12)
-    ax.set_title(f'ROI Frequency Profiles at NM Event Time (t=0)\nChannels: {roi_channels}', 
-                 fontsize=14, fontweight='bold')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    
-    if save_path:
-        profile_file = os.path.join(save_path, 'nm_roi_frequency_profiles.png')
-        plt.savefig(profile_file, dpi=300, bbox_inches='tight')
-        print(f"ROI frequency profile plot saved: {profile_file}")
-    
-    plt.show()
+        ax.axhline(0, color='black', linestyle='--', alpha=0.5)
+        ax.set_xlabel('Frequency (Hz)', fontsize=12)
+        ax.set_ylabel('Z-score at Event Time', fontsize=12)
+        ax.set_title(f'ROI Frequency Profiles at NM Event Time (t=0)\n{electrode_label.capitalize()}: {electrode_display}', 
+                     fontsize=14, fontweight='bold')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        if save_path:
+            profile_file = os.path.join(save_path, 'nm_roi_frequency_profiles.png')
+            plt.savefig(profile_file, dpi=300, bbox_inches='tight')
+            print(f"ROI frequency profile plot saved: {profile_file}")
+        
+        plt.show()
+    else:
+        print("Skipping frequency profiles plot (show_frequency_profiles=False)")
 
 
 # Keep the original single-channel function for backward compatibility
@@ -971,13 +1056,13 @@ def main():
     try:
         # Load session data
         print("Loading EEG session data...")
-        session_data = load_session_data('all_eeg_data.pkl', session_index=0)
+        session_data = load_session_data('data/processed/all_eeg_data.pkl', session_index=0)
         
         # Analysis parameters
-        roi_specification = 'frontal'
-        freq_range = (2, 10)       # Extended theta range
-        freq_step = 0.125            # 0.5 Hz resolution
-        window_duration = 1.0      # ±0.5s around events
+        roi_specification = [2]
+        freq_range = (3, 8)       # Extended theta range
+        n_freqs = 20               # 25 log-spaced frequencies across 2-10 Hz
+        window_duration = 1      # ±0.5s around events
         n_cycles_factor = 3.0      # For good frequency resolution
         
         # Run ROI analysis
@@ -985,10 +1070,11 @@ def main():
             session_data=session_data,
             roi_or_channels=roi_specification, #or just a list of channel numbers like [10, 11, 12]
             freq_range=freq_range,
-            freq_step=freq_step,
+            n_freqs=n_freqs,
             window_duration=window_duration,
             n_cycles_factor=n_cycles_factor,
-            save_path='nm_roi_theta_results'
+            save_path='nm_roi_theta_results',
+            show_frequency_profiles=True  # Set to True to show frequency profiles plot
         )
         
         # Print summary

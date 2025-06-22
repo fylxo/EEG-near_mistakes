@@ -11,7 +11,7 @@ ROI_MAP = {
     'visual': [8, 9, 10, 12, 13, 14, 19, 20, 21, 23, 24, 25]
 }
 
-def load_electrode_mappings(csv_file='consistent_electrode_mappings.csv'):
+def load_electrode_mappings(csv_file='data/config/consistent_electrode_mappings.csv'):
     """
     Load electrode mappings from CSV file into a pandas DataFrame.
     
@@ -24,73 +24,54 @@ def load_electrode_mappings(csv_file='consistent_electrode_mappings.csv'):
     df = pd.read_csv(csv_file, index_col='rat_id')
     return df
 
-def get_channels(rat_id, roi_or_channels, mapping_df=None, roi_map=None):
-    """
-    Get channel indices for a given rat_id and ROI or custom channel numbers.
 
-    Args:
-        rat_id (str or int): Rat identifier
-        roi_or_channels: 
-            - If str: a ROI name, e.g. 'frontal'
-            - If list of int: channel numbers (1-based, as in roi_map) or direct indices (0-based)
-        mapping_df (pd.DataFrame, optional): DataFrame with electrode mappings. 
-                                           If None, loads from default CSV file.
-        roi_map (dict, optional): ROI to electrode number mapping. If None, uses default ROI_MAP.
-        
-    Returns:
-        List of channel indices (0-based) for use with EEG data.
+def get_channel_indices_from_electrodes(rat_id, electrode_numbers, mapping_df):
     """
-    # Load default data if not provided
+    Given a rat_id, a list of electrode numbers (e.g., [2, 29, 31, 32]),
+    and the mapping_df, return the 0-based channel indices for the EEG data.
+    """
+    # Try to match either str or int representation of rat_id
+    str_id = str(rat_id)
+    int_id = int(rat_id) if isinstance(rat_id, (str, int)) and str(rat_id).isdigit() else None
+
+    if rat_id in mapping_df.index:
+        row = mapping_df.loc[rat_id].values
+    elif str_id in mapping_df.index:
+        row = mapping_df.loc[str_id].values
+    elif int_id is not None and int_id in mapping_df.index:
+        row = mapping_df.loc[int_id].values
+    else:
+        raise ValueError(f"Rat ID {rat_id} not found in mapping DataFrame index. Available: {list(mapping_df.index)}")
+
+    row = row[~pd.isna(row)].astype(int)
+    indices = [i for i, val in enumerate(row) if val in electrode_numbers]
+    return indices
+
+
+def get_channels(rat_id, roi_or_channels, mapping_df=None, roi_map=None):
     if mapping_df is None:
         mapping_df = load_electrode_mappings()
     if roi_map is None:
         roi_map = ROI_MAP
-    
-    # Handle both string and integer rat IDs
-    if rat_id not in mapping_df.index:
-        # Try converting to int if it's a string
-        if isinstance(rat_id, str) and rat_id.isdigit():
-            rat_id = int(rat_id)
-        # Try converting to string if it's an int
-        elif isinstance(rat_id, int):
-            rat_id_str = str(rat_id)
-            if rat_id_str in mapping_df.index:
-                rat_id = rat_id_str
-        
-        # If still not found, raise error
-        if rat_id not in mapping_df.index:
-            available_rats = list(mapping_df.index)
-            raise ValueError(f"Rat ID {rat_id} not found in mapping! Available rats: {available_rats}")
 
-    mapping_row = mapping_df.loc[rat_id].values
-    # Remove NaN values and convert to int
-    mapping_row = mapping_row[~pd.isna(mapping_row)].astype(int)
-    
+    # Handle ROI name (string)
     if isinstance(roi_or_channels, str):
-        # ROI name
-        roi_name = roi_or_channels.lower()
-        if roi_name not in roi_map:
-            raise ValueError(f"ROI '{roi_name}' not in roi_map keys: {list(roi_map.keys())}")
-        roi_numbers = set(roi_map[roi_name])
-        indices = [i for i, val in enumerate(mapping_row) if val in roi_numbers]
-        return indices
+        if roi_or_channels not in roi_map:
+            raise ValueError(f"ROI '{roi_or_channels}' not in ROI_MAP")
+        electrode_numbers = roi_map[roi_or_channels]
+        return get_channel_indices_from_electrodes(rat_id, electrode_numbers, mapping_df)
+    # Handle explicit electrode numbers
     elif isinstance(roi_or_channels, (list, tuple, set)):
-        # Custom list of numbers (could be channel numbers or indices)
-        if all(isinstance(x, int) for x in roi_or_channels):
-            # Are these actual mapping numbers (e.g. 1-32), or 0-based indices?
-            if all((1 <= x <= 32) for x in roi_or_channels):
-                # Assume channel numbers, map to indices
-                indices = [i for i, val in enumerate(mapping_row) if val in roi_or_channels]
-                return indices
-            elif all((0 <= x < len(mapping_row)) for x in roi_or_channels):
-                # Direct indices
-                return list(roi_or_channels)
-            else:
-                raise ValueError(f"List must be all 0-{len(mapping_row)-1} (indices) or 1-32 (channel numbers)")
+        # If all entries are int and in 1-32, treat as electrode numbers (NOT channel indices!)
+        if all(isinstance(x, int) and 1 <= x <= 32 for x in roi_or_channels):
+            return get_channel_indices_from_electrodes(rat_id, roi_or_channels, mapping_df)
         else:
-            raise ValueError("Custom channel list must be integers")
+            raise ValueError("Custom channel list must be electrode numbers (1-32)")
     else:
         raise ValueError("roi_or_channels must be a string or a list/tuple/set of ints")
+
+
+
 
 def get_roi_info(rat_id, mapping_df=None, roi_map=None):
     """

@@ -1003,7 +1003,7 @@ def test_pipeline_on_sample():
     """
     try:
         # Load first session
-        session_data = load_session_data('../all_eeg_data.pkl', session_index=0)
+        session_data = load_session_data('../data/processed/all_eeg_data.pkl', session_index=0)
         
         # Create session ID
         session_id = f"{session_data.get('rat_id', 'unknown')}_{session_data.get('session_date', 'unknown')}"

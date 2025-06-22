@@ -20,7 +20,7 @@ from spectral_analysis_pipeline import (
     save_analysis_results
 )
 
-def get_dataset_info(pkl_path: str = 'all_eeg_data.pkl') -> Dict:
+def get_dataset_info(pkl_path: str = 'data/processed/all_eeg_data.pkl') -> Dict:
     """
     Get basic information about the dataset without loading all data.
     
@@ -180,7 +180,7 @@ def process_session_batch(pkl_path: str,
     return batch_results
 
 
-def process_all_sessions(pkl_path: str = 'all_eeg_data.pkl',
+def process_all_sessions(pkl_path: str = 'data/processed/all_eeg_data.pkl',
                         output_dir: str = 'all_sessions_results',
                         max_sessions: Optional[int] = None,
                         **kwargs) -> Dict:
@@ -339,7 +339,7 @@ def test_batch_processing():
     test_indices = [0, 1, 2] if info['n_sessions'] >= 3 else list(range(info['n_sessions']))
     
     batch_results = process_session_batch(
-        pkl_path='all_eeg_data.pkl',
+        pkl_path='data/processed/all_eeg_data.pkl',
         session_indices=test_indices,
         output_dir='test_batch_results',
         channels=list(range(8)),  # First 8 channels for speed

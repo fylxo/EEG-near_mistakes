@@ -27,8 +27,8 @@ def test_roi_analysis():
         
         # Test loading session data
         print("\n2. Testing session data loading...")
-        if os.path.exists('all_eeg_data.pkl'):
-            session_data = load_session_data('all_eeg_data.pkl', session_index=0)
+        if os.path.exists('data/processed/all_eeg_data.pkl'):
+            session_data = load_session_data('data/processed/all_eeg_data.pkl', session_index=0)
             print(f"Session loaded: {session_data.get('rat_id', 'unknown')}")
             
             # Test ROI analysis with hippocampus
@@ -37,7 +37,7 @@ def test_roi_analysis():
                 session_data=session_data,
                 roi_or_channels='hippocampus',
                 freq_range=(4, 8),
-                freq_step=1.0,
+                n_freqs=15,
                 window_duration=1.0,
                 save_path='test_roi_results'
             )
@@ -53,7 +53,7 @@ def test_roi_analysis():
                 session_data=session_data,
                 roi_or_channels=[0, 1, 2],  # First 3 channels
                 freq_range=(4, 8),
-                freq_step=1.0,
+                n_freqs=15,
                 window_duration=1.0,
                 save_path='test_custom_results'
             )
@@ -64,7 +64,7 @@ def test_roi_analysis():
             return True
             
         else:
-            print("❗ all_eeg_data.pkl not found. Cannot test with real data.")
+            print("❗ data/processed/all_eeg_data.pkl not found. Cannot test with real data.")
             print("The ROI functionality has been implemented and should work when data is available.")
             return True
             

@@ -7,6 +7,12 @@ to validate that all functions work correctly before processing the full dataset
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+import os
+
+# Add the src directory to path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src', 'core'))
+
 from spectral_analysis_pipeline import (
     load_session_data, 
     process_single_session,
@@ -22,7 +28,7 @@ def quick_test():
     try:
         # Try to load just one session to check data format
         print("1. Testing data loading...")
-        session_data = load_session_data('all_eeg_data.pkl', session_index=0)
+        session_data = load_session_data('data/processed/all_eeg_data.pkl', session_index=0)
         
         print(f"✓ Data loaded successfully:")
         print(f"  - EEG shape: {session_data['eeg'].shape}")

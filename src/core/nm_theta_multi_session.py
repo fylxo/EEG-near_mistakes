@@ -76,9 +76,9 @@ def load_all_sessions_for_rat(pkl_path: str, rat_id: Union[str, int]) -> List[Tu
 
 def analyze_rat_multi_session(rat_id: Union[str, int],
                              roi_or_channels: Union[str, List[int]],
-                             pkl_path: str = 'all_eeg_data.pkl',
+                             pkl_path: str = 'data/processed/all_eeg_data.pkl',
                              freq_range: Tuple[float, float] = (3, 8),
-                             freq_step: float = 0.5,
+                             n_freqs: int = 30,
                              window_duration: float = 1.0,
                              n_cycles_factor: float = 3.0,
                              save_path: str = None,
@@ -97,8 +97,8 @@ def analyze_rat_multi_session(rat_id: Union[str, int],
         Path to all_eeg_data.pkl file
     freq_range : Tuple[float, float]
         Frequency range for analysis (default: 3-8 Hz)
-    freq_step : float
-        Frequency resolution (default: 0.5 Hz)
+    n_freqs : int
+        Number of logarithmically spaced frequencies (default: 30)
     window_duration : float
         Event window duration (default: 1.0s = ±0.5s)
     n_cycles_factor : float
@@ -156,7 +156,7 @@ def analyze_rat_multi_session(rat_id: Union[str, int],
                 session_data=session_data,
                 roi_or_channels=roi_or_channels,
                 freq_range=freq_range,
-                freq_step=freq_step,
+                n_freqs=n_freqs,
                 window_duration=window_duration,
                 n_cycles_factor=n_cycles_factor,
                 save_path=session_save_path,
@@ -437,7 +437,7 @@ def main():
         rat_id = 10501  # Example rat ID
         roi_specification = 'frontal'  # Can also be a list like [10, 11, 12] (channel numbers 1-32)
         freq_range = (2, 10)      # Extended theta range
-        freq_step = 0.25
+        n_freqs = 30              # 30 log-spaced frequencies across 2-10 Hz
         window_duration = 1.0
         n_cycles_factor = 3.0
         
@@ -449,9 +449,9 @@ def main():
         results = analyze_rat_multi_session(
             rat_id=rat_id,
             roi_or_channels=roi_specification,
-            pkl_path='all_eeg_data.pkl',
+            pkl_path='data/processed/all_eeg_data.pkl',
             freq_range=freq_range,
-            freq_step=freq_step,
+            n_freqs=n_freqs,
             window_duration=window_duration,
             n_cycles_factor=n_cycles_factor
         )

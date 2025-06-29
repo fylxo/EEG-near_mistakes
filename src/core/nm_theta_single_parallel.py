@@ -1268,7 +1268,7 @@ def main():
                 print(f"✓ Sessions analyzed: {results['n_sessions_analyzed']}")
                 print(f"✓ Parallel method: {results['parallel_method']}")
                 print(f"✓ Processing time: {results['processing_time']:.2f}s")
-                print(f"✓ NM sizes found: {list(results['aggregated_windows'].keys())}")
+                print(f"✓ NM sizes found: {[float(key) for key in results['aggregated_windows'].keys()]}")
             return True
         else:
             # Use directly set variables
@@ -1340,7 +1340,7 @@ def main():
                 print(f"✓ Sessions analyzed: {results['n_sessions_analyzed']}")
                 print(f"✓ Parallel method: {results['parallel_method']}")
                 print(f"✓ Processing time: {results['processing_time']:.2f}s")
-                print(f"✓ NM sizes found: {list(results['aggregated_windows'].keys())}")
+                print(f"✓ NM sizes found: {[float(key) for key in results['aggregated_windows'].keys()]}")
             return True
     except Exception as e:
         print(f"❌ Error in parallel analysis: {e}")

@@ -1116,7 +1116,7 @@ def main():
         print(f"- ROI channels: {results['roi_channels']}")
         print(f"- Number of channels: {len(results['roi_channels'])}")
         print(f"- Frequency range: {freq_range[0]}-{freq_range[1]} Hz")
-        print(f"- NM sizes found: {list(results['normalized_windows'].keys())}")
+        print(f"- NM sizes found: {[float(key) for key in results['normalized_windows'].keys()]}")
         print(f"- Total events analyzed: {sum(data['n_events'] for data in results['normalized_windows'].values())}")
         
         return True

@@ -732,7 +732,7 @@ def main(rat_id: str = None,
         print(f"\n🎉 Memory-efficient analysis completed for rat {rat_id}!")
         print(f"✓ ROI: {roi} -> channels {results['roi_channels']}")
         print(f"✓ Sessions analyzed: {results['n_sessions_analyzed']}")
-        print(f"✓ NM sizes found: {list(results['aggregated_windows'].keys())}")
+        print(f"✓ NM sizes found: {[float(key) for key in results['aggregated_windows'].keys()]}")
         
         for nm_size, data in results['aggregated_windows'].items():
             print(f"  - NM size {nm_size}: {data['total_events']} events from {data['n_sessions']} sessions")

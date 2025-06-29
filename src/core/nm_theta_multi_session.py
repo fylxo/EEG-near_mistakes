@@ -513,7 +513,7 @@ def main():
         print(f"\n🎉 Multi-session analysis completed for rat {rat_id}!")
         print(f"✓ ROI: {roi_specification} -> channels {results['roi_channels']}")
         print(f"✓ Sessions analyzed: {results['n_sessions_analyzed']}")
-        print(f"✓ NM sizes found: {list(results['averaged_windows'].keys())}")
+        print(f"✓ NM sizes found: {[float(key) for key in results['averaged_windows'].keys()]}")
         
         for nm_size, data in results['averaged_windows'].items():
             print(f"  - NM size {nm_size}: {data['n_events']} events from {data['n_sessions']} sessions")

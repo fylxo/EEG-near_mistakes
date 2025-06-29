@@ -45,7 +45,7 @@ def test_roi_analysis():
             print(f"✓ ROI analysis completed successfully!")
             print(f"  - ROI channels: {results['roi_channels']}")
             print(f"  - Frequency range: {results['freqs'][0]:.1f}-{results['freqs'][-1]:.1f} Hz")
-            print(f"  - NM windows: {list(results['normalized_windows'].keys())}")
+            print(f"  - NM windows: {[float(key) for key in results['normalized_windows'].keys()]}")
             
             # Test with custom channel list
             print("\n4. Testing custom channel list...")

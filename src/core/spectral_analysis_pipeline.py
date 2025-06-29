@@ -158,19 +158,30 @@ def extract_event_windows(tfr_full: np.ndarray,
     """
     half_window = window_duration / 2
     time_diffs = np.diff(times)
-    sfreq = 1 / np.median(time_diffs)
+    
+    # Calculate actual sampling frequency for information
+    actual_sfreq = 1 / np.median(time_diffs)
     
     # Check for variable sampling rate
     if np.std(time_diffs) > 0.001:  # Threshold for sampling rate variability
         print(f"Warning: Variable sampling rate detected (std={np.std(time_diffs):.4f}s). Results may be inaccurate.")
     
+    # ALWAYS use exactly 200 Hz for consistency across all rats and sessions
+    # This ensures cross-rat averaging will work properly
+    sfreq = 200.0
     window_samples = int(window_duration * sfreq)
+    
+    # Warn if there's a significant difference from actual frequency
+    if abs(actual_sfreq - sfreq) > 1.0:
+        print(f"Warning: Actual sampling frequency {actual_sfreq:.2f} Hz differs from standard {sfreq} Hz")
+        print(f"Using standard {sfreq} Hz for cross-rat consistency")
+    
+    print(f"Extracting {event_type} event windows (actual: {actual_sfreq:.2f} Hz → using: {sfreq} Hz)...")
     
     valid_windows = []
     valid_sizes = []
     valid_event_indices = []
     
-    print(f"Extracting {event_type} event windows...")
     for i, event_time in enumerate(event_times):
         start_time = event_time - half_window
         end_time = event_time + half_window

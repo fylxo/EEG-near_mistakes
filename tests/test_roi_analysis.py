@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src', 'core'))
 
-from nm_theta_analysis import analyze_session_nm_theta_roi, load_session_data
+from nm_theta_single_basic import analyze_session_nm_theta_roi, load_session_data
 from electrode_utils import get_roi_info, load_electrode_mappings
 
 def test_roi_analysis():

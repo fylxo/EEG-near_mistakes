@@ -4,7 +4,9 @@
       "Bash(mv:*)",
       "Bash(mkdir:*)",
       "Bash(git rm:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(sed:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

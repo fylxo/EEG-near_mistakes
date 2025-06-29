@@ -26,7 +26,7 @@ import warnings
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import from our modules
-from nm_theta_analysis import analyze_session_nm_theta_roi, load_session_data
+from nm_theta_single_basic import analyze_session_nm_theta_roi, load_session_data
 from electrode_utils import get_channels, load_electrode_mappings
 
 
@@ -278,6 +278,47 @@ def average_session_results(session_results: List[Dict],
                 print(f"  Session {session_idx + 1}: {windows.shape[0]} events")
         
         if size_windows:
+            # Validate window shapes before concatenation
+            print(f"  Validating {len(size_windows)} window arrays for shape consistency...")
+            
+            # Check all window arrays have the same shape (except first dimension)
+            shapes = [windows.shape for windows in size_windows]
+            freq_time_shapes = [shape[1:] for shape in shapes]  # (n_freqs, n_times) parts
+            unique_ft_shapes = list(set(freq_time_shapes))
+            
+            if len(unique_ft_shapes) > 1:
+                print(f"  ❌ ERROR: Inconsistent window shapes found!")
+                print(f"     (n_freqs, n_times) shape counts: {[(shape, freq_time_shapes.count(shape)) for shape in unique_ft_shapes]}")
+                for idx, (windows, session_idx) in enumerate(zip(size_windows, size_sessions)):
+                    print(f"     Session {session_idx + 1}: shape {windows.shape}")
+                
+                # Try to find common shape and exclude outliers
+                ft_shape_counts = [(shape, freq_time_shapes.count(shape)) for shape in unique_ft_shapes]
+                most_common_ft_shape = max(ft_shape_counts, key=lambda x: x[1])[0]
+                print(f"     Most common (n_freqs, n_times) shape: {most_common_ft_shape}")
+                
+                # Filter to only use windows with the most common shape
+                valid_windows = []
+                valid_sessions = []
+                valid_total_events = 0
+                
+                for windows, session_idx in zip(size_windows, size_sessions):
+                    if windows.shape[1:] == most_common_ft_shape:
+                        valid_windows.append(windows)
+                        valid_sessions.append(session_idx)
+                        valid_total_events += windows.shape[0]
+                
+                print(f"     Using {len(valid_windows)}/{len(size_windows)} sessions with (n_freqs, n_times) shape {most_common_ft_shape}")
+                size_windows = valid_windows
+                size_sessions = valid_sessions
+                total_events = valid_total_events
+                
+                if len(size_windows) == 0:
+                    print(f"  ❌ No valid windows found for NM size {nm_size}")
+                    continue
+            else:
+                print(f"  ✓ All window arrays have consistent (n_freqs, n_times) shape: {unique_ft_shapes[0]}")
+            
             # Concatenate all windows across sessions
             all_windows = np.concatenate(size_windows, axis=0)  # (total_events, n_freqs, n_times)
             
@@ -398,6 +439,13 @@ def plot_multi_session_results(results: Dict, save_path: str = None):
             shading='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax
         )
         axes[0, i].axvline(0, color='black', linestyle='--', linewidth=2, alpha=0.8)
+        
+        # Set y-axis ticks to show actual frequency values for spectrogram
+        freq_step = max(1, len(freqs) // 10)
+        freq_ticks = freqs[::freq_step]
+        axes[0, i].set_yticks(freq_ticks)
+        axes[0, i].set_yticklabels([f'{f:.1f}' for f in freq_ticks])
+        
         axes[0, i].set_title(f'NM Size {nm_size}\n{n_events} events, {n_sessions} sessions', 
                             fontsize=12, fontweight='bold')
         axes[0, i].set_ylabel('Frequency (Hz)', fontsize=10)
@@ -413,6 +461,11 @@ def plot_multi_session_results(results: Dict, save_path: str = None):
         
         axes[1, i].plot(freqs, freq_profile, 'o-', linewidth=2, markersize=4, color='blue')
         axes[1, i].axhline(0, color='black', linestyle='--', alpha=0.5)
+        
+        # Set x-axis ticks to show actual frequency values for frequency profile
+        axes[1, i].set_xticks(freq_ticks)
+        axes[1, i].set_xticklabels([f'{f:.1f}' for f in freq_ticks])
+        
         axes[1, i].set_xlabel('Frequency (Hz)', fontsize=10)
         axes[1, i].set_ylabel('Z-score at t=0', fontsize=10)
         axes[1, i].set_title(f'Event Profile', fontsize=11)

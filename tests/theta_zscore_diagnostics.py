@@ -24,7 +24,7 @@ from collections import defaultdict
 # Add src/core to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src', 'core'))
 
-from nm_theta_analysis import load_session_data, compute_roi_theta_spectrogram
+from nm_theta_single_basic import load_session_data, compute_roi_theta_spectrogram
 from electrode_utils import get_channels, load_electrode_mappings
 
 def extract_event_windows(power_matrix: np.ndarray, 
@@ -53,8 +53,20 @@ def extract_event_windows(power_matrix: np.ndarray,
         Time vector for windows relative to event (e.g., -0.5 to +0.5)
     """
     half_window = window_duration / 2
-    sfreq = 1 / np.median(np.diff(times))  # Estimate sampling frequency
+    
+    # Calculate actual sampling frequency for information
+    time_diffs = np.diff(times)
+    actual_sfreq = 1 / np.median(time_diffs)
+    
+    # ALWAYS use exactly 200 Hz for consistency across all rats and sessions
+    # This ensures cross-rat averaging will work properly
+    sfreq = 200.0
     window_samples = int(window_duration * sfreq)
+    
+    # Warn if there's a significant difference from actual frequency
+    if abs(actual_sfreq - sfreq) > 1.0:
+        print(f"Warning: Actual sampling frequency {actual_sfreq:.2f} Hz differs from standard {sfreq} Hz")
+        print(f"Using standard {sfreq} Hz for cross-rat consistency")
     
     # Create relative time vector for windows
     window_times = np.linspace(-half_window, half_window, window_samples)
@@ -312,7 +324,7 @@ def main():
         eeg_channel = session_data['eeg'][test_channel, :]
         
         # Compute raw spectrogram for single channel
-        from nm_theta_analysis import compute_high_res_theta_spectrogram
+        from nm_theta_single_basic import compute_high_res_theta_spectrogram
         _, single_channel_raw_power = compute_high_res_theta_spectrogram(
             eeg_channel, 
             sfreq=200.0, 

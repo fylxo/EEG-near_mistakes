@@ -21,7 +21,7 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional, Union
 from collections import defaultdict
 from scipy import signal
-import warnings
+import mne
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -178,19 +178,13 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
         # Extract channel data
         eeg_channel = eeg_data[ch_idx, :]
         
-        # Compute spectrogram for this channel
-        power_list = []
-        for j, (freq, cycles) in enumerate(zip(freqs, n_cycles)):
-            single_freq = np.array([freq])
-            _, single_power = morlet_spectrogram(
-                eeg_channel, 
-                sfreq=sfreq, 
-                freqs=single_freq, 
-                n_cycles=int(cycles)
-            )
-            power_list.append(single_power[0, :])
-        
-        channel_power = np.array(power_list)
+        # OPTIMIZED: Process all frequencies at once with adaptive n_cycles
+        data = eeg_channel[np.newaxis, np.newaxis, :]  # (1, 1, n_times)
+        power = mne.time_frequency.tfr_array_morlet(
+            data, sfreq=sfreq, freqs=freqs, n_cycles=n_cycles, 
+            output='power', zero_mean=True
+        )
+        channel_power = power[0, 0, :, :]  # (n_freqs, n_times)
         
         # Compute per-channel statistics for normalization
         ch_mean = np.mean(channel_power, axis=1)  # Mean per frequency
@@ -265,24 +259,13 @@ def compute_high_res_theta_spectrogram(eeg_data: np.ndarray,
     
     # Compute Morlet spectrogram with adaptive cycles
     try:
-        # Use the existing morlet_spectrogram function with custom n_cycles
-        # Note: We'll compute each frequency separately for adaptive n_cycles
-        power_list = []
-        
-        for i, (freq, cycles) in enumerate(zip(freqs, n_cycles)):
-            print(f"Processing frequency {freq:.1f} Hz ({i+1}/{len(freqs)}) with {cycles:.1f} cycles")
-            
-            # Compute single frequency
-            single_freq = np.array([freq])
-            _, single_power = morlet_spectrogram(
-                eeg_data, 
-                sfreq=sfreq, 
-                freqs=single_freq, 
-                n_cycles=int(cycles)
-            )
-            power_list.append(single_power[0, :])  # Extract single frequency
-        
-        power = np.array(power_list)
+        # OPTIMIZED: Process all frequencies at once with adaptive n_cycles
+        data = eeg_data[np.newaxis, np.newaxis, :]  # (1, 1, n_times)
+        power = mne.time_frequency.tfr_array_morlet(
+            data, sfreq=sfreq, freqs=freqs, n_cycles=n_cycles, 
+            output='power', zero_mean=True
+        )
+        power = power[0, 0, :, :]  # (n_freqs, n_times)
         
     except Exception as e:
         print(f"Error in spectrogram computation: {e}")
@@ -359,8 +342,22 @@ def extract_nm_event_windows(power: np.ndarray,
     print(f"Extracting NM event windows (±{window_duration/2:.1f}s around events)...")
     
     half_window = window_duration / 2
-    sfreq = 1 / np.median(np.diff(times))
+    
+    # Calculate actual sampling frequency for information
+    time_diffs = np.diff(times)
+    actual_sfreq = 1 / np.median(time_diffs)
+    
+    # ALWAYS use exactly 200 Hz for consistency across all rats and sessions
+    # This ensures cross-rat averaging will work properly
+    sfreq = 200.0
     window_samples = int(window_duration * sfreq)
+    
+    # Warn if there's a significant difference from actual frequency
+    if abs(actual_sfreq - sfreq) > 1.0:
+        print(f"Warning: Actual sampling frequency {actual_sfreq:.2f} Hz differs from standard {sfreq} Hz")
+        print(f"Using standard {sfreq} Hz for cross-rat consistency")
+    
+    print(f"Actual sampling frequency: {actual_sfreq:.2f} Hz → Using {sfreq} Hz (window size: {window_samples} samples)")
     
     # Initialize storage for each NM size
     nm_windows = defaultdict(list)
@@ -596,6 +593,13 @@ def plot_nm_theta_results(normalized_windows: Dict,
         
         # Add event line
         axes[i].axvline(0, color='black', linestyle='--', linewidth=2, alpha=0.8)
+        
+        # Set y-axis ticks to show actual frequency values
+        # Show every 5th frequency or max 10 ticks to avoid overcrowding
+        freq_step = max(1, len(freqs) // 10)
+        freq_ticks = freqs[::freq_step]
+        axes[i].set_yticks(freq_ticks)
+        axes[i].set_yticklabels([f'{f:.1f}' for f in freq_ticks])
         
         # Formatting
         axes[i].set_title(f'NM Size {size}\n(n={n_events} events)', 
@@ -946,6 +950,19 @@ def plot_roi_theta_results(normalized_windows: Dict,
     vmax_abs = max(abs(vmin), abs(vmax))
     vmin, vmax = -vmax_abs, vmax_abs
     
+    # Helper: choose indices to label (first, last, and a few intermediates)
+    def get_label_indices(n, n_labels=8):
+        if n <= n_labels:
+            return list(range(n))
+        idxs = [0]
+        step = (n - 1) / (n_labels - 1)
+        for i in range(1, n_labels-1):
+            idxs.append(int(round(i * step)))
+        idxs.append(n-1)
+        return sorted(set(idxs))
+    
+    label_indices = get_label_indices(len(freqs), n_labels=5)
+    
     for i, size in enumerate(nm_sizes):
         data = normalized_windows[size]
         
@@ -962,6 +979,14 @@ def plot_roi_theta_results(normalized_windows: Dict,
         
         # Add event line
         axes[i].axvline(0, color='black', linestyle='--', linewidth=2, alpha=0.8)
+        
+        # Set y-axis ticks to all frequency positions, label only selected
+        freq_ticks = freqs
+        freq_labels = [''] * len(freq_ticks)
+        for idx in label_indices:
+            freq_labels[idx] = f'{freq_ticks[idx]:.1f}'
+        axes[i].set_yticks(freq_ticks)
+        axes[i].set_yticklabels(freq_labels)
         
         # Formatting
         axes[i].set_title(f'NM Size {size}\n(n={n_events} events)', 
@@ -1000,6 +1025,14 @@ def plot_roi_theta_results(normalized_windows: Dict,
             
             ax.plot(freqs, freq_profile, 'o-', linewidth=2, markersize=6,
                     label=f'NM Size {size} (n={data["n_events"]})', alpha=0.8)
+        
+        # Set x-axis ticks to all frequency positions, label only selected
+        freq_ticks = freqs
+        freq_labels = [''] * len(freq_ticks)
+        for idx in label_indices:
+            freq_labels[idx] = f'{freq_ticks[idx]:.1f}'
+        ax.set_xticks(freq_ticks)
+        ax.set_xticklabels(freq_labels)
         
         ax.axhline(0, color='black', linestyle='--', alpha=0.5)
         ax.set_xlabel('Frequency (Hz)', fontsize=12)
@@ -1060,8 +1093,8 @@ def main():
         
         # Analysis parameters
         roi_specification = [2]
-        freq_range = (3, 8)       # Extended theta range
-        n_freqs = 20               # 25 log-spaced frequencies across 2-10 Hz
+        freq_range = (1, 45)       # Extended theta range
+        n_freqs = 40               # 25 log-spaced frequencies across 2-10 Hz
         window_duration = 1      # ±0.5s around events
         n_cycles_factor = 3.0      # For good frequency resolution
         

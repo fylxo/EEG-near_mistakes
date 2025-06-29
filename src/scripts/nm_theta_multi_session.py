@@ -37,7 +37,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'core'))
 
 # Import from our modules
-from nm_theta_analysis import analyze_session_nm_theta_roi
+from nm_theta_single_basic import analyze_session_nm_theta_roi
 from electrode_utils import get_channels, load_electrode_mappings
 
 
@@ -266,6 +266,7 @@ def aggregate_session_results(session_summaries: List[Dict],
         
         size_spectrograms = []
         size_sessions = []
+        session_window_times = []
         total_events = 0
         
         # Load each session's results for this NM size
@@ -279,25 +280,94 @@ def aggregate_session_results(session_summaries: List[Dict],
                 if nm_size in session_result['normalized_windows']:
                     windows_data = session_result['normalized_windows'][nm_size]
                     windows = windows_data['windows']  # (n_events, n_freqs, n_times)
+                    window_times = windows_data['window_times']
                     
                     # Get average spectrogram for this session and NM size
                     session_avg = np.mean(windows, axis=0)  # (n_freqs, n_times)
                     size_spectrograms.append(session_avg)
                     size_sessions.append(session_idx)
+                    session_window_times.append(window_times)
                     total_events += windows.shape[0]
                     
-                    print(f"    Session {summary['session_index']}: {windows.shape[0]} events")
+                    print(f"    Session {summary['session_index']}: {windows.shape[0]} events, shape {session_avg.shape}")
                 
                 # Clean up after loading
                 del session_result
                 gc.collect()
         
         if size_spectrograms:
+            # Validate spectrogram shapes before averaging
+            print(f"  Validating {len(size_spectrograms)} spectrograms for shape consistency...")
+            
+            # Check all spectrograms have the same shape
+            shapes = [spec.shape for spec in size_spectrograms]
+            unique_shapes = list(set(shapes))
+            
+            if len(unique_shapes) > 1:
+                print(f"  ❌ ERROR: Inconsistent spectrogram shapes found!")
+                print(f"     Shape counts: {[(shape, shapes.count(shape)) for shape in unique_shapes]}")
+                for idx, (spec, session_idx) in enumerate(zip(size_spectrograms, size_sessions)):
+                    print(f"     Session {session_idx}: shape {spec.shape}")
+                
+                # Try to find common shape and exclude outliers
+                shape_counts = [(shape, shapes.count(shape)) for shape in unique_shapes]
+                most_common_shape = max(shape_counts, key=lambda x: x[1])[0]
+                print(f"     Most common shape: {most_common_shape} ({shape_counts})")
+                
+                # Filter to only use spectrograms with the most common shape
+                valid_spectrograms = []
+                valid_sessions = []
+                valid_events = 0
+                
+                for spec, session_idx in zip(size_spectrograms, size_sessions):
+                    if spec.shape == most_common_shape:
+                        valid_spectrograms.append(spec)
+                        valid_sessions.append(session_idx)
+                        # Re-calculate events for this session (approximate)
+                        valid_events += total_events // len(size_spectrograms)
+                
+                print(f"     Using {len(valid_spectrograms)}/{len(size_spectrograms)} sessions with shape {most_common_shape}")
+                size_spectrograms = valid_spectrograms
+                size_sessions = valid_sessions
+                total_events = valid_events
+                
+                if len(size_spectrograms) == 0:
+                    print(f"  ❌ No valid spectrograms found for NM size {nm_size}")
+                    continue
+            else:
+                print(f"  ✓ All spectrograms have consistent shape: {unique_shapes[0]}")
+            
+            # Validate window times consistency
+            print(f"  Validating window times consistency...")
+            if len(session_window_times) > 1:
+                # Check if all window times are approximately equal
+                first_window_times = session_window_times[0]
+                window_times_consistent = True
+                max_time_diff = 0
+                
+                for i, wt in enumerate(session_window_times[1:], 1):
+                    if len(wt) != len(first_window_times):
+                        print(f"     ⚠ Session window times have different lengths: {len(first_window_times)} vs {len(wt)}")
+                        window_times_consistent = False
+                    else:
+                        time_diff = np.max(np.abs(wt - first_window_times))
+                        max_time_diff = max(max_time_diff, time_diff)
+                        if time_diff > 0.001:  # 1ms tolerance
+                            print(f"     ⚠ Session {i} window times differ by {time_diff:.6f}s")
+                            window_times_consistent = False
+                
+                if window_times_consistent:
+                    print(f"  ✓ Window times are consistent (max diff: {max_time_diff:.6f}s)")
+                    window_times = first_window_times
+                else:
+                    print(f"  ⚠ Window times inconsistent, using first session's times")
+                    window_times = first_window_times
+            else:
+                window_times = session_window_times[0]
+                print(f"  ✓ Single session, using its window times")
+            
             # Average spectrograms across sessions
             all_session_avg = np.mean(size_spectrograms, axis=0)  # (n_freqs, n_times)
-            
-            # Get window times from first session (should be consistent)
-            window_times = first_result['normalized_windows'][list(first_result['normalized_windows'].keys())[0]]['window_times']
             
             aggregated_windows[nm_size] = {
                 'avg_spectrogram': all_session_avg,
@@ -371,6 +441,8 @@ def plot_aggregated_results(results: Dict, save_path: str = None):
     # Center colormap at 0
     vmax_abs = max(abs(vmin), abs(vmax))
     vmin, vmax = -vmax_abs, vmax_abs
+
+    #vmin, vmax = -0.5, 0.3
     
     for i, nm_size in enumerate(nm_sizes):
         data = aggregated_windows[nm_size]
@@ -385,6 +457,13 @@ def plot_aggregated_results(results: Dict, save_path: str = None):
             shading='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax
         )
         axes[0, i].axvline(0, color='black', linestyle='--', linewidth=2, alpha=0.8)
+        
+        # Set y-axis ticks to show actual frequency values for spectrogram
+        freq_step = max(1, len(freqs) // 10)
+        freq_ticks = freqs[::freq_step]
+        axes[0, i].set_yticks(freq_ticks)
+        axes[0, i].set_yticklabels([f'{f:.1f}' for f in freq_ticks])
+        
         axes[0, i].set_title(f'NM Size {nm_size}\n{total_events} events, {n_sessions} sessions', 
                             fontsize=12, fontweight='bold')
         axes[0, i].set_ylabel('Frequency (Hz)', fontsize=10)
@@ -400,6 +479,11 @@ def plot_aggregated_results(results: Dict, save_path: str = None):
         
         axes[1, i].plot(freqs, freq_profile, 'o-', linewidth=2, markersize=4, color='blue')
         axes[1, i].axhline(0, color='black', linestyle='--', alpha=0.5)
+        
+        # Set x-axis ticks to show actual frequency values for frequency profile
+        axes[1, i].set_xticks(freq_ticks)
+        axes[1, i].set_xticklabels([f'{f:.1f}' for f in freq_ticks])
+        
         axes[1, i].set_xlabel('Frequency (Hz)', fontsize=10)
         axes[1, i].set_ylabel('Z-score at t=0', fontsize=10)
         axes[1, i].set_title(f'Event Profile', fontsize=11)
@@ -665,12 +749,12 @@ def main(rat_id: str = None,
 if __name__ == "__main__":
     # Example usage with direct parameters
     success = main(
-        rat_id="9592",  # Change this to your desired rat ID
-        roi="frontal",
+        rat_id="442",  # Change this to your desired rat ID
+        roi='frontal',
         pkl_path="data/processed/all_eeg_data.pkl",
         freq_min=2.0,
         freq_max=8.0,
-        n_freqs=30,
+        n_freqs=40,
         window_duration=1.0,
         save_path=None,  # Will use default naming
         show_plots=True

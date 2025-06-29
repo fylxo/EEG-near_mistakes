@@ -1,85 +1,33 @@
 #!/usr/bin/env python3
 """
-Memory-Efficient Cross-Rats NM Theta Analysis
+Cross-Rats NM Theta Analysis
 
-This script performs theta oscillation analysis around Near Mistake (NM) events
-across multiple rats using a memory-efficient approach. It:
+This script performs NM theta analysis across multiple rats, aggregating results
+from individual rat multi-session analyses.
 
-1. Loads the main data file once
-2. For each rat: processes all sessions, saves multi-session results, discards from memory
-3. Aggregates multi-session results across all rats
-4. Saves final cross-rats averaged results
-
-Key Features:
-- Memory-efficient: processes one rat at a time
-- Uses nm_theta_analyzer.py for consistent multi-session analysis  
-- Automatic rat discovery from dataset
-- Cross-rats statistical aggregation
-- Comprehensive result saving and visualization
-
-Usage:
-    python nm_theta_cross_rats.py --roi frontal --freq_min 3 --freq_max 8
-
-Author: Generated for EEG near-mistake cross-rats analysis
+Author: Generated for cross-rats EEG near-mistake analysis
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
-import pickle
 import os
 import sys
-import pandas as pd
-import argparse
-import gc
-from typing import Dict, List, Tuple, Optional, Union
-from collections import defaultdict
-import warnings
-from datetime import datetime
+import pickle
 import json
+import gc
+import argparse
+import numpy as np
+import matplotlib.pyplot as plt
+from typing import Dict, List, Tuple, Optional, Union
+from datetime import datetime
+from collections import defaultdict
 
-# Add paths for imports
+# Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
 
-# Import our modules
+# Import the run_analysis function from nm_theta_analyzer
 from nm_theta_analyzer import run_analysis
 
 
-def check_rat_channel_count(rat_id: str, pkl_path: str) -> int:
-    """
-    Check the number of channels for a specific rat by examining their EEG data.
-    
-    Parameters:
-    -----------
-    rat_id : str
-        Rat ID to check
-    pkl_path : str
-        Path to the main EEG data file
-        
-    Returns:
-    --------
-    channel_count : int
-        Number of channels for this rat
-    """
-    print(f"🔍 Checking channel count for rat {rat_id}")
-    
-    with open(pkl_path, 'rb') as f:
-        all_data = pickle.load(f)
-    
-    # Find first session for this rat
-    for session_data in all_data:
-        if str(session_data.get('rat_id')) == str(rat_id):
-            eeg_data = session_data.get('eeg')
-            if eeg_data is not None:
-                channel_count = eeg_data.shape[0]
-                print(f"✓ Rat {rat_id}: {channel_count} channels")
-                return channel_count
-    
-    print(f"⚠️  No EEG data found for rat {rat_id}")
-    return 0
-
-
-def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = True) -> List[str]:
+def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False) -> List[str]:
     """
     Discover all unique rat IDs from the dataset.
     
@@ -88,7 +36,7 @@ def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = True) -> Lis
     pkl_path : str
         Path to the main EEG data file
     exclude_20_channel_rats : bool
-        Whether to exclude rats with 20 channels (default: True)
+        Whether to exclude rats with 20 channels (default: False - removed validation)
         
     Returns:
     --------
@@ -110,30 +58,15 @@ def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = True) -> Lis
     rat_ids_list = sorted(list(rat_ids))
     print(f"✓ Found {len(rat_ids_list)} unique rats: {rat_ids_list}")
     
-    # Check channel counts and filter if requested
-    if exclude_20_channel_rats:
-        print(f"\n🔍 Checking channel counts (excluding 20-channel rats)...")
-        valid_rat_ids = []
-        excluded_rat_ids = []
-        
-        for rat_id in rat_ids_list:
-            channel_count = check_rat_channel_count(rat_id, pkl_path)
-            if channel_count == 20:
-                excluded_rat_ids.append(rat_id)
-                print(f"❌ Excluding rat {rat_id} (20 channels)")
-            else:
-                valid_rat_ids.append(rat_id)
-                print(f"✅ Including rat {rat_id} ({channel_count} channels)")
-        
-        print(f"\n📊 Channel count filtering results:")
-        print(f"  Total rats found: {len(rat_ids_list)}")
-        print(f"  Rats with 20 channels (excluded): {len(excluded_rat_ids)}")
-        print(f"  Valid rats (included): {len(valid_rat_ids)}")
-        
-        if excluded_rat_ids:
-            print(f"  Excluded rat IDs: {excluded_rat_ids}")
-        
-        rat_ids_list = valid_rat_ids
+    # Exclude rat 9442 specifically (has 20 channels)
+    if '9442' in rat_ids_list:
+        rat_ids_list.remove('9442')
+        print(f"❌ Excluding rat 9442 (20 channels)")
+    
+    print(f"\n📊 Final rat selection:")
+    print(f"  Total rats found: {len(rat_ids_list) + 1}")  # +1 for the excluded rat
+    print(f"  Rats to process: {len(rat_ids_list)}")
+    print(f"  Excluded rats: ['9442']")
     
     # Clean up memory
     del all_data
@@ -282,11 +215,20 @@ def aggregate_cross_rats_results(
     for rat_id, results in valid_results.items():
         print(f"Processing results from rat {rat_id}")
         
-        for nm_size, window_data in results['aggregated_windows'].items():
+        # Debug: Print available keys
+        print(f"  Available keys in results: {list(results.keys())}")
+        if 'averaged_windows' in results:
+            print(f"  NM sizes in averaged_windows: {list(results['averaged_windows'].keys())}")
+        else:
+            print(f"  ❌ ERROR: 'averaged_windows' key not found!")
+            print(f"  Available keys: {list(results.keys())}")
+            continue
+        
+        for nm_size, window_data in results['averaged_windows'].items():
             spectrograms = aggregated_windows[nm_size]['spectrograms']
             spectrograms.append(window_data['avg_spectrogram'])
             
-            aggregated_windows[nm_size]['total_events'].append(window_data['total_events'])
+            aggregated_windows[nm_size]['total_events'].append(window_data['n_events'])
             aggregated_windows[nm_size]['n_sessions'].append(window_data['n_sessions'])
             aggregated_windows[nm_size]['rat_ids'].append(rat_id)
     
@@ -307,7 +249,7 @@ def aggregate_cross_rats_results(
             'avg_spectrogram': avg_spectrogram,
             'sem_spectrogram': sem_spectrogram,
             'individual_spectrograms': spectrograms,
-            'window_times': first_result['aggregated_windows'][nm_size]['window_times'],
+            'window_times': first_result['averaged_windows'][nm_size]['window_times'],
             'total_events_per_rat': data['total_events'],
             'n_sessions_per_rat': data['n_sessions'],
             'rat_ids': data['rat_ids'],
@@ -324,7 +266,7 @@ def aggregate_cross_rats_results(
         'roi_specification': roi_specification,
         'roi_channels': first_result['roi_channels'],
         'frequencies': frequencies,
-        'aggregated_windows': final_aggregated_windows,
+        'averaged_windows': final_aggregated_windows,
         'analysis_parameters': {
             'frequency_range': freq_range,
             'n_frequencies': n_freqs,
@@ -353,7 +295,7 @@ def aggregate_cross_rats_results(
     summary_data = {
         'n_rats': n_valid_rats,
         'rat_ids': list(valid_results.keys()),
-        'nm_sizes_analyzed': list(final_aggregated_windows.keys()),
+        'nm_sizes_analyzed': [float(key) for key in final_aggregated_windows.keys()],
         'total_events_all_rats': {nm_size: data['total_events_all_rats'] 
                                   for nm_size, data in final_aggregated_windows.items()},
         'total_sessions_all_rats': {nm_size: data['total_sessions_all_rats']
@@ -392,7 +334,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
     roi_channels = results['roi_channels']
     
     # Create figure with subplots for each NM size
-    nm_sizes = list(results['aggregated_windows'].keys())
+    nm_sizes = [float(key) for key in results['averaged_windows'].keys()]
     n_nm_sizes = len(nm_sizes)
     
     if n_nm_sizes == 0:
@@ -404,7 +346,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
         axes = axes.reshape(1, -1)
     
     for i, nm_size in enumerate(nm_sizes):
-        window_data = results['aggregated_windows'][nm_size]
+        window_data = results['averaged_windows'][nm_size]
         avg_spectrogram = window_data['avg_spectrogram']
         sem_spectrogram = window_data['sem_spectrogram']
         window_times = window_data['window_times']
@@ -454,7 +396,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
     # Create individual rat comparison plot
     if n_nm_sizes == 1:  # Only create if single NM size to avoid complexity
         nm_size = nm_sizes[0]
-        window_data = results['aggregated_windows'][nm_size]
+        window_data = results['averaged_windows'][nm_size]
         individual_spectrograms = window_data['individual_spectrograms']
         rat_ids = window_data['rat_ids']
         
@@ -594,7 +536,7 @@ def run_cross_rats_analysis(
     print(f"\nSummary:")
     print(f"  Rats processed: {aggregated_results['n_rats']}")
     print(f"  Rat IDs: {aggregated_results['rat_ids']}")
-    print(f"  NM sizes analyzed: {list(aggregated_results['aggregated_windows'].keys())}")
+    print(f"  NM sizes analyzed: {[float(key) for key in aggregated_results['averaged_windows'].keys()]}")
     print(f"  ROI channels: {aggregated_results['roi_channels']}")
     
     return aggregated_results
@@ -682,7 +624,7 @@ if __name__ == "__main__":
     else:
         # For IDE usage, run the analysis directly
         results = run_cross_rats_analysis(
-            roi="2",                    # ROI specification
+            roi="31",                    # ROI specification
             pkl_path="data/processed/all_eeg_data.pkl",  # Data file path
             freq_min=1.0,                     # Minimum frequency
             freq_max=45.0,                     # Maximum frequency

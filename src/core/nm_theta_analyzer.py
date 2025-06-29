@@ -198,8 +198,6 @@ def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_
             )
             
     elif mode == "multi":
-        import sys
-        sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'scripts'))
         from nm_theta_multi_session import analyze_rat_multi_session_memory_efficient
         
         save_dir = save_path or f'results/multi_session/rat_{rat_id}_memory_efficient'

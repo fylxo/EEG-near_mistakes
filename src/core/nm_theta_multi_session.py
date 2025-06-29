@@ -21,6 +21,7 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional, Union
 from collections import defaultdict
 import warnings
+import gc
 
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -222,6 +223,155 @@ def analyze_rat_multi_session(rat_id: Union[str, int],
     print("=" * 70)
     
     return averaged_results
+
+
+def analyze_rat_multi_session_memory_efficient(rat_id: Union[str, int],
+                                              roi_or_channels: Union[str, List[int]],
+                                              pkl_path: str = 'data/processed/all_eeg_data.pkl',
+                                              freq_range: Tuple[float, float] = (3, 8),
+                                              n_freqs: int = 30,
+                                              window_duration: float = 1.0,
+                                              n_cycles_factor: float = 3.0,
+                                              save_path: str = None,
+                                              mapping_df: Optional[pd.DataFrame] = None,
+                                              show_plots: bool = True) -> Dict:
+    """
+    Memory-efficient multi-session analysis that processes sessions one by one.
+    
+    Parameters:
+    -----------
+    rat_id : Union[str, int]
+        Rat identifier
+    roi_or_channels : Union[str, List[int]]
+        Either ROI name (e.g., 'frontal', 'hippocampus') or list of channel numbers (1-32)
+    pkl_path : str
+        Path to all_eeg_data.pkl file
+    freq_range : Tuple[float, float]
+        Frequency range for analysis (default: 3-8 Hz)
+    n_freqs : int
+        Number of logarithmically spaced frequencies (default: 30)
+    window_duration : float
+        Event window duration (default: 1.0s = ±0.5s)
+    n_cycles_factor : float
+        Factor for adaptive n_cycles (default: 3.0)
+    save_path : str, optional
+        Directory to save results. If None, uses f'nm_multi_session_memory_efficient_rat_{rat_id}'
+    mapping_df : Optional[pd.DataFrame]
+        Electrode mapping dataframe. If None, loads from default CSV
+    show_plots : bool
+        Whether to display final plots (default: True)
+    
+    Returns:
+    --------
+    results : Dict
+        Final aggregated analysis results
+    """
+    
+    print("=" * 80)
+    print(f"MEMORY-EFFICIENT MULTI-SESSION NM THETA ANALYSIS - RAT {rat_id}")
+    print("=" * 80)
+    
+    if save_path is None:
+        save_path = f'results/multi_session/rat_{rat_id}_memory_efficient'
+    
+    # Step 1: Load all data once and find sessions for this rat
+    print(f"Loading data from {pkl_path}...")
+    with open(pkl_path, 'rb') as f:
+        all_data = pickle.load(f)
+    
+    # Find sessions for this rat
+    target_rat_id = str(rat_id)
+    session_indices = []
+    rat_sessions = []
+    
+    for session_idx, session_data in enumerate(all_data):
+        session_rat_id = str(session_data.get('rat_id', 'unknown'))
+        if session_rat_id == target_rat_id:
+            session_indices.append(session_idx)
+            rat_sessions.append(session_data)
+    
+    if not session_indices:
+        raise ValueError(f"No sessions found for rat {rat_id}")
+    
+    print(f"Found {len(session_indices)} sessions for rat {rat_id}")
+    
+    # Step 2: Process each session individually
+    print(f"\nProcessing {len(session_indices)} sessions individually...")
+    session_results = []
+    session_metadata = []
+    
+    for session_idx, (orig_session_idx, session_data) in enumerate(zip(session_indices, rat_sessions)):
+        print(f"\n--- Session {session_idx + 1}/{len(session_indices)} (Index {orig_session_idx}) ---")
+        session_date = session_data.get('session_date', 'unknown')
+        print(f"Session {orig_session_idx}: Date {session_date}")
+        
+        try:
+            # Run ROI analysis for this session
+            session_save_path = os.path.join(save_path, f'session_{orig_session_idx}')
+            
+            result = analyze_session_nm_theta_roi(
+                session_data=session_data,
+                roi_or_channels=roi_or_channels,
+                freq_range=freq_range,
+                n_freqs=n_freqs,
+                window_duration=window_duration,
+                n_cycles_factor=n_cycles_factor,
+                save_path=session_save_path,
+                mapping_df=mapping_df,
+                show_plots=False  # Don't plot individual sessions
+            )
+            
+            session_results.append(result)
+            
+            # Store metadata
+            metadata = {
+                'original_session_index': orig_session_idx,
+                'session_date': session_date,
+                'rat_id': session_data.get('rat_id'),
+                'roi_channels': result['roi_channels'],
+                'total_nm_events': sum(data['n_events'] for data in result['normalized_windows'].values()),
+                'nm_sizes': list(result['normalized_windows'].keys())
+            }
+            session_metadata.append(metadata)
+            
+            print(f"✓ Session {session_idx + 1} completed successfully")
+            print(f"  ROI channels: {result['roi_channels']}")
+            print(f"  NM events analyzed: {metadata['total_nm_events']}")
+            
+        except Exception as e:
+            print(f"❌ Error processing session {session_idx + 1}: {e}")
+            print("Continuing with remaining sessions...")
+            continue
+    
+    # Clean up loaded data
+    del all_data
+    gc.collect()
+    
+    if not session_results:
+        raise ValueError("No sessions were successfully processed!")
+    
+    print(f"\n✓ Successfully processed {len(session_results)}/{len(session_indices)} sessions")
+    
+    # Step 3: Average results across sessions
+    print("\nAveraging results across sessions...")
+    aggregated_results = average_session_results(session_results, session_metadata, rat_id)
+    
+    # Step 4: Save results
+    print("\nSaving aggregated results...")
+    save_multi_session_results(aggregated_results, save_path)
+    
+    # Step 5: Plot results
+    if show_plots:
+        print("\nPlotting final results...")
+        plot_multi_session_results(aggregated_results, save_path)
+    else:
+        print("Skipping plots (show_plots=False)")
+    
+    print("=" * 80)
+    print("MEMORY-EFFICIENT MULTI-SESSION ANALYSIS COMPLETE!")
+    print("=" * 80)
+    
+    return aggregated_results
 
 
 def average_session_results(session_results: List[Dict], 

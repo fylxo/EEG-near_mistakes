@@ -243,11 +243,9 @@ def aggregate_cross_rats_results(
         
         # Average across rats
         avg_spectrogram = np.mean(spectrograms, axis=0)
-        sem_spectrogram = np.std(spectrograms, axis=0) / np.sqrt(spectrograms.shape[0])
         
         final_aggregated_windows[nm_size] = {
             'avg_spectrogram': avg_spectrogram,
-            'sem_spectrogram': sem_spectrogram,
             'individual_spectrograms': spectrograms,
             'window_times': first_result['averaged_windows'][nm_size]['window_times'],
             'total_events_per_rat': data['total_events'],
@@ -341,43 +339,29 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
         print("⚠️  No NM sizes to plot")
         return
     
-    fig, axes = plt.subplots(n_nm_sizes, 2, figsize=(15, 5 * n_nm_sizes))
+    fig, axes = plt.subplots(n_nm_sizes, 1, figsize=(10, 5 * n_nm_sizes))
     if n_nm_sizes == 1:
-        axes = axes.reshape(1, -1)
+        axes = [axes]
     
     for i, nm_size in enumerate(nm_sizes):
         window_data = results['averaged_windows'][nm_size]
         avg_spectrogram = window_data['avg_spectrogram']
-        sem_spectrogram = window_data['sem_spectrogram']
         window_times = window_data['window_times']
         
-        # Plot 1: Average spectrogram across rats
-        ax1 = axes[i, 0]
-        im1 = ax1.imshow(avg_spectrogram, aspect='auto', origin='lower',
-                        extent=[window_times[0], window_times[-1], 
-                               frequencies[0], frequencies[-1]],
-                        cmap='RdBu_r', vmin=-2, vmax=2)
-        ax1.axvline(x=0, color='black', linestyle='--', alpha=0.7)
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Frequency (Hz)')
-        ax1.set_title(f'NM Size {nm_size} - Average Across {n_rats} Rats\n'
-                     f'Total Events: {window_data["total_events_all_rats"]}, '
-                     f'Sessions: {window_data["total_sessions_all_rats"]}')
+        # Plot: Average spectrogram across rats
+        ax = axes[i]
+        im = ax.imshow(avg_spectrogram, aspect='auto', origin='lower',
+                      extent=[window_times[0], window_times[-1], 
+                             frequencies[0], frequencies[-1]],
+                      cmap='RdBu_r', vmin=-2, vmax=2)
+        ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Frequency (Hz)')
+        ax.set_title(f'NM Size {nm_size} - Average Across {n_rats} Rats\n'
+                    f'Total Events: {window_data["total_events_all_rats"]}, '
+                    f'Sessions: {window_data["total_sessions_all_rats"]}')
         
-        plt.colorbar(im1, ax=ax1, label='Z-score')
-        
-        # Plot 2: Standard error across rats
-        ax2 = axes[i, 1]
-        im2 = ax2.imshow(sem_spectrogram, aspect='auto', origin='lower',
-                        extent=[window_times[0], window_times[-1],
-                               frequencies[0], frequencies[-1]],
-                        cmap='viridis')
-        ax2.axvline(x=0, color='white', linestyle='--', alpha=0.7)
-        ax2.set_xlabel('Time (s)')
-        ax2.set_ylabel('Frequency (Hz)')
-        ax2.set_title(f'NM Size {nm_size} - Standard Error Across Rats')
-        
-        plt.colorbar(im2, ax=ax2, label='SEM Z-score')
+        plt.colorbar(im, ax=ax, label='Z-score')
     
     # Add overall title
     roi_str = f"ROI: {results['roi_specification']} (channels: {roi_channels})"

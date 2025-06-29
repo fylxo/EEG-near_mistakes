@@ -64,8 +64,8 @@ def get_electrode_numbers_from_channels(rat_id: Union[str, int],
     else:
         raise ValueError(f"Rat ID {rat_id} not found in mapping DataFrame")
 
-    # Remove NaN values and convert to integers
-    row = row[~pd.isna(row)].astype(int)
+    # Remove NaN values and convert to integers, then to list for consistent display
+    row = row[~pd.isna(row)].astype(int).tolist()
     
     # Get electrode numbers for the given channel indices
     electrode_numbers = []

@@ -311,6 +311,41 @@ def aggregate_cross_rats_results(
     return aggregated_results
 
 
+def calculate_color_limits(spectrograms: List[np.ndarray], percentile: float = 95.0) -> Tuple[float, float]:
+    """
+    Calculate reasonable color map limits based on the actual data.
+    
+    Parameters:
+    -----------
+    spectrograms : List[np.ndarray]
+        List of spectrogram arrays
+    percentile : float
+        Percentile to use for clipping outliers (default: 95.0)
+        
+    Returns:
+    --------
+    vmin, vmax : Tuple[float, float]
+        Color map limits
+    """
+    # Concatenate all spectrograms to get overall data range
+    all_data = np.concatenate([spec.flatten() for spec in spectrograms])
+    
+    # Calculate percentiles to clip outliers
+    vmin = float(np.percentile(all_data, 100 - percentile))
+    vmax = float(np.percentile(all_data, percentile))
+    
+    # Ensure symmetric limits around zero for better visualization
+    abs_max = max(abs(vmin), abs(vmax))
+    vmin = -abs_max
+    vmax = abs_max
+    
+    # Round to reasonable decimal places
+    vmin = round(vmin, 2)
+    vmax = round(vmax, 2)
+    
+    return vmin, vmax
+
+
 def create_cross_rats_visualizations(results: Dict, save_path: str):
     """
     Create comprehensive visualizations for cross-rats results.
@@ -339,6 +374,16 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
         print("⚠️  No NM sizes to plot")
         return
     
+    # Calculate color limits from all spectrograms
+    all_spectrograms = []
+    for nm_size in nm_sizes:
+        window_data = results['averaged_windows'][nm_size]
+        all_spectrograms.append(window_data['avg_spectrogram'])
+        all_spectrograms.extend(window_data['individual_spectrograms'])
+    
+    vmin, vmax = calculate_color_limits(all_spectrograms)
+    print(f"📊 Color map limits: [{vmin}, {vmax}] (calculated from data)")
+    
     fig, axes = plt.subplots(n_nm_sizes, 1, figsize=(10, 5 * n_nm_sizes))
     if n_nm_sizes == 1:
         axes = [axes]
@@ -353,7 +398,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
         im = ax.imshow(avg_spectrogram, aspect='auto', origin='lower',
                       extent=[window_times[0], window_times[-1], 
                              frequencies[0], frequencies[-1]],
-                      cmap='RdBu_r', vmin=-2, vmax=2)
+                      cmap='RdBu_r', vmin=vmin, vmax=vmax)
         ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Frequency (Hz)')
@@ -368,7 +413,9 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
     freq_str = f"Freq: {results['analysis_parameters']['frequency_range'][0]}-{results['analysis_parameters']['frequency_range'][1]} Hz"
     
     plt.suptitle(f'Cross-Rats NM Theta Analysis\n{roi_str}, {freq_str}', fontsize=14)
-    plt.tight_layout()
+    
+    # Apply custom spacing parameters for better plot layout
+    plt.subplots_adjust(left=0.052, bottom=0.07, right=0.55, top=0.924, wspace=0.206, hspace=0.656)
     
     # Save plot
     plot_file = os.path.join(save_path, 'cross_rats_spectrograms.png')
@@ -397,7 +444,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
             im = ax.imshow(spectrogram, aspect='auto', origin='lower',
                           extent=[window_times[0], window_times[-1],
                                  frequencies[0], frequencies[-1]],
-                          cmap='RdBu_r', vmin=-2, vmax=2)
+                          cmap='RdBu_r', vmin=vmin, vmax=vmax)
             ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
             ax.set_xlabel('Time (s)')
             ax.set_ylabel('Frequency (Hz)')
@@ -411,7 +458,9 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
             axes[j].set_visible(False)
         
         plt.suptitle(f'Individual Rat Spectrograms - NM Size {nm_size}\n{roi_str}, {freq_str}', fontsize=14)
-        plt.tight_layout()
+        
+        # Apply custom spacing parameters for individual rats plot
+        plt.subplots_adjust(left=0.052, bottom=0.07, right=0.55, top=0.924, wspace=0.206, hspace=0.656)
         
         individual_plot_file = os.path.join(save_path, f'individual_rats_nm_{nm_size}.png')
         plt.savefig(individual_plot_file, dpi=300, bbox_inches='tight')
@@ -595,6 +644,208 @@ Examples:
     )
 
 
+def run_all_channels_analysis(
+    pkl_path: str = 'data/processed/all_eeg_data.pkl',
+    freq_min: float = 1.0,
+    freq_max: float = 45.0,
+    n_freqs: int = 30,
+    window_duration: float = 2.0,
+    n_cycles_factor: float = 3.0,
+    rat_ids: Optional[List[str]] = None,
+    base_save_path: str = 'results',
+    show_plots: bool = False,
+    channels: Optional[List[int]] = None
+) -> Dict[str, Dict]:
+    """
+    Run cross-rats NM theta analysis for all channels sequentially with memory cleanup.
+    
+    Parameters:
+    -----------
+    pkl_path : str
+        Path to main EEG data file
+    freq_min : float
+        Minimum frequency (Hz)
+    freq_max : float
+        Maximum frequency (Hz)
+    n_freqs : int
+        Number of frequencies
+    window_duration : float
+        Event window duration (s)
+    n_cycles_factor : float
+        Cycles factor for spectrograms
+    rat_ids : Optional[List[str]]
+        Specific rat IDs to process, None for all rats
+    base_save_path : str
+        Base directory for saving results
+    show_plots : bool
+        Show plots during processing
+    channels : Optional[List[int]]
+        Specific channels to process, None for all channels (1-32)
+        
+    Returns:
+    --------
+    all_results : Dict[str, Dict]
+        Dictionary mapping channel -> results for each channel
+    """
+    print("🧠 Cross-Rats NM Theta Analysis - All Channels")
+    print("=" * 80)
+    print(f"Data file: {pkl_path}")
+    print(f"Frequency range: {freq_min}-{freq_max} Hz ({n_freqs} freqs)")
+    print(f"Window duration: {window_duration}s")
+    print(f"Base save path: {base_save_path}")
+    print("=" * 80)
+    
+    # Define channels to process
+    if channels is None:
+        channels = list(range(1, 33))  # Channels 1-32
+    else:
+        channels = [int(ch) for ch in channels]
+    
+    print(f"📊 Processing {len(channels)} channels: {channels}")
+    
+    # Create main results directory
+    all_channels_dir = os.path.join(base_save_path, 'all_channels_analysis')
+    os.makedirs(all_channels_dir, exist_ok=True)
+    
+    # Create plots directory
+    plots_dir = os.path.join(all_channels_dir, 'plots')
+    os.makedirs(plots_dir, exist_ok=True)
+    
+    # Store results for all channels
+    all_results = {}
+    
+    # Discover rat IDs once
+    if rat_ids:
+        print(f"Using specified rat IDs: {rat_ids}")
+    else:
+        rat_ids = discover_rat_ids(pkl_path)
+    
+    for i, channel in enumerate(channels):
+        print(f"\n{'='*60}")
+        print(f"📡 Processing Channel {channel} ({i+1}/{len(channels)})")
+        print(f"{'='*60}")
+        
+        try:
+            # Create temporary directory for this channel
+            temp_save_path = os.path.join(base_save_path, 'cross_rats')
+            
+            # Run analysis for this channel
+            results = run_cross_rats_analysis(
+                roi=str(channel),
+                pkl_path=pkl_path,
+                freq_min=freq_min,
+                freq_max=freq_max,
+                n_freqs=n_freqs,
+                window_duration=window_duration,
+                n_cycles_factor=n_cycles_factor,
+                rat_ids=rat_ids,
+                save_path=temp_save_path,
+                show_plots=show_plots
+            )
+            
+            # Store results
+            all_results[f"channel_{channel}"] = results
+            
+            # Move plots to organized directory
+            channel_plots_dir = os.path.join(plots_dir, f'channel_{channel}')
+            os.makedirs(channel_plots_dir, exist_ok=True)
+            
+            # Move plot files
+            plot_files = [
+                'cross_rats_spectrograms.png',
+                'cross_rats_aggregated_results.pkl',
+                'cross_rats_summary.json'
+            ]
+            
+            for plot_file in plot_files:
+                src_path = os.path.join(temp_save_path, plot_file)
+                dst_path = os.path.join(channel_plots_dir, plot_file)
+                if os.path.exists(src_path):
+                    import shutil
+                    shutil.move(src_path, dst_path)
+            
+            # Move individual rat plots if they exist
+            for nm_size in results['averaged_windows'].keys():
+                individual_plot = f'individual_rats_nm_{nm_size}.png'
+                src_path = os.path.join(temp_save_path, individual_plot)
+                dst_path = os.path.join(channel_plots_dir, individual_plot)
+                if os.path.exists(src_path):
+                    import shutil
+                    shutil.move(src_path, dst_path)
+            
+            print(f"✓ Channel {channel} completed successfully")
+            print(f"  Results saved to: {channel_plots_dir}")
+            
+        except Exception as e:
+            print(f"❌ Error processing channel {channel}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            all_results[f"channel_{channel}"] = None
+            
+        finally:
+            # Clean up temporary files and memory
+            print(f"🧹 Cleaning up memory and temporary files for channel {channel}")
+            
+            # Remove temporary cross_rats directory
+            if os.path.exists(temp_save_path):
+                import shutil
+                try:
+                    shutil.rmtree(temp_save_path)
+                    print(f"  ✓ Removed temporary directory: {temp_save_path}")
+                except Exception as e:
+                    print(f"  ⚠️  Could not remove temporary directory: {e}")
+            
+            # Force garbage collection
+            gc.collect()
+            
+            # Small delay to ensure cleanup
+            import time
+            time.sleep(1)
+    
+    # Save comprehensive results
+    all_results_file = os.path.join(all_channels_dir, 'all_channels_results.pkl')
+    with open(all_results_file, 'wb') as f:
+        pickle.dump(all_results, f)
+    
+    # Create summary
+    successful_channels = [ch for ch, results in all_results.items() if results is not None]
+    failed_channels = [ch for ch, results in all_results.items() if results is None]
+    
+    summary = {
+        'total_channels': len(channels),
+        'successful_channels': len(successful_channels),
+        'failed_channels': len(failed_channels),
+        'successful_channel_list': [ch.split('_')[1] for ch in successful_channels],
+        'failed_channel_list': [ch.split('_')[1] for ch in failed_channels],
+        'analysis_parameters': {
+            'frequency_range': [freq_min, freq_max],
+            'n_frequencies': n_freqs,
+            'window_duration': window_duration,
+            'n_cycles_factor': n_cycles_factor
+        },
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    summary_file = os.path.join(all_channels_dir, 'all_channels_summary.json')
+    with open(summary_file, 'w') as f:
+        json.dump(summary, f, indent=2)
+    
+    print(f"\n{'='*80}")
+    print("✅ All Channels Analysis Completed!")
+    print(f"{'='*80}")
+    print(f"📊 Summary:")
+    print(f"  Total channels processed: {len(channels)}")
+    print(f"  Successful: {len(successful_channels)}")
+    print(f"  Failed: {len(failed_channels)}")
+    print(f"  Results directory: {all_channels_dir}")
+    print(f"  Plots directory: {plots_dir}")
+    
+    if failed_channels:
+        print(f"\n❌ Failed channels: {[ch.split('_')[1] for ch in failed_channels]}")
+    
+    return all_results
+
+
 # Example usage for IDE/notebook environment
 if __name__ == "__main__":
     # Check if we're running in IDE mode (with direct function calls)
@@ -607,8 +858,12 @@ if __name__ == "__main__":
         main()
     else:
         # For IDE usage, run the analysis directly
+        # Uncomment the line below to run all channels analysis
+        #all_results = run_all_channels_analysis()
+        
+        # Or run single channel analysis as before 
         results = run_cross_rats_analysis(
-            roi="31",                    # ROI specification
+            roi="1,2,3",                    # ROI specification
             pkl_path="data/processed/all_eeg_data.pkl",  # Data file path
             freq_min=1.0,                     # Minimum frequency
             freq_max=45.0,                     # Maximum frequency
@@ -618,4 +873,4 @@ if __name__ == "__main__":
             rat_ids=None,                     # None for all rats, or ["rat1", "rat2"] for specific rats
             save_path="results/cross_rats",   # Save directory
             show_plots=False                  # Show plots during processing
-        )
+    )

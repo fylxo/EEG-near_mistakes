@@ -158,8 +158,10 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
     
     # Create logarithmically spaced frequency vector
     freqs = np.geomspace(freq_range[0], freq_range[1], n_freqs)
-    n_cycles = np.maximum(3, freqs * n_cycles_factor)
-    
+    #n_cycles = np.maximum(3, freqs * n_cycles_factor)
+    #n_cycles = np.full(len(freqs), 5.0)
+    n_cycles = np.linspace(3, 10, len(freqs))
+
     # Print exact frequencies being used
     print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
     print(f"   Range: {freq_range[0]:.2f} - {freq_range[1]:.2f} Hz")

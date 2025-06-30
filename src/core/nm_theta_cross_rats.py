@@ -421,18 +421,22 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
         avg_spectrogram = window_data['avg_spectrogram']
         window_times = window_data['window_times']
         
-        # Plot: Average spectrogram across rats
+        # Plot: Average spectrogram across rats using pcolormesh for better frequency axis
         ax = axes[i]
-        im = ax.imshow(avg_spectrogram, aspect='auto', origin='lower',
-                      extent=[window_times[0], window_times[-1], 
-                             frequencies[0], frequencies[-1]],
-                      cmap='RdBu_r', vmin=vmin, vmax=vmax)
+        im = ax.pcolormesh(window_times, frequencies, avg_spectrogram,
+                          shading='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
         ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Frequency (Hz)')
         ax.set_title(f'NM Size {nm_size} - Average Across {n_rats} Rats\n'
                     f'Total Events: {window_data["total_events_all_rats"]}, '
                     f'Sessions: {window_data["total_sessions_all_rats"]}')
+        
+        # Set y-axis ticks to show actual frequency values
+        freq_step = max(1, len(frequencies) // 10)
+        freq_ticks = frequencies[::freq_step]
+        ax.set_yticks(freq_ticks)
+        ax.set_yticklabels([f'{f:.1f}' for f in freq_ticks])
         
         plt.colorbar(im, ax=ax, label='Z-score')
     
@@ -469,15 +473,19 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
             spectrogram = individual_spectrograms[j]
             rat_id = rat_ids[j]
             
-            im = ax.imshow(spectrogram, aspect='auto', origin='lower',
-                          extent=[window_times[0], window_times[-1],
-                                 frequencies[0], frequencies[-1]],
-                          cmap='RdBu_r', vmin=vmin, vmax=vmax)
+            im = ax.pcolormesh(window_times, frequencies, spectrogram,
+                              shading='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
             ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
             ax.set_xlabel('Time (s)')
             ax.set_ylabel('Frequency (Hz)')
             ax.set_title(f'Rat {rat_id}\nEvents: {window_data["total_events_per_rat"][j]}, '
                         f'Sessions: {window_data["n_sessions_per_rat"][j]}')
+            
+            # Set y-axis ticks to show actual frequency values
+            freq_step = max(1, len(frequencies) // 10)
+            freq_ticks = frequencies[::freq_step]
+            ax.set_yticks(freq_ticks)
+            ax.set_yticklabels([f'{f:.1f}' for f in freq_ticks])
             
             plt.colorbar(im, ax=ax, label='Z-score')
         
@@ -913,7 +921,7 @@ if __name__ == "__main__":
             pkl_path="data/processed/all_eeg_data.pkl",  # Data file path
             freq_min=1.0,                     # Minimum frequency
             freq_max=45.0,                     # Maximum frequency
-            n_freqs=30,                       # Number of frequencies
+            n_freqs=40,                       # Number of frequencies
             window_duration=2.0,              # Event window duration
             n_cycles_factor=3.0,              # Cycles factor
             rat_ids=None,                     # None for all rats, or ["rat1", "rat2"] for specific rats

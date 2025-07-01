@@ -1,0 +1,20 @@
+   Rat 10501: 18 sessions, total NM events: 2538
+   Rat 1055: 23 sessions, total NM events: 3725X
+   Rat 10592: 6 sessions, total NM events: 1087X
+   Rat 10593: 12 sessions, total NM events: 2099X
+   Rat 422: 35 sessions, total NM events: 6585
+   Rat 441: 30 sessions, total NM events: 5551X
+   Rat 442: 37 sessions, total NM events: 7960X
+   Rat 531: 36 sessions, total NM events: 5241
+   Rat 532: 28 sessions, total NM events: 5787X
+   Rat 9151: 19 sessions, total NM events: 3200X
+   Rat 9441: 8 sessions, total NM events: 1611X
+   Rat 9442: 24 sessions, total NM events: 4618X
+   Rat 9591: 7 sessions, total NM events: 1672X
+   Rat 9592: 23 sessions, total NM events: 4192X
+
+
+
+
+Problems:
+9442(20 channels)

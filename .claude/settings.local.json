@@ -6,7 +6,9 @@
       "Bash(git rm:*)",
       "Bash(rm:*)",
       "Bash(sed:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

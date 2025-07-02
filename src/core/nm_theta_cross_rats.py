@@ -423,8 +423,11 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
         
         # Plot: Average spectrogram across rats using pcolormesh for better frequency axis
         ax = axes[i]
-        im = ax.pcolormesh(window_times, frequencies, avg_spectrogram,
-                          shading='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
+        
+        # Use log-frequency spacing for y-axis
+        log_frequencies = np.log10(frequencies)
+        im = ax.pcolormesh(window_times, log_frequencies, avg_spectrogram,
+                          shading='auto', cmap='viridis', vmin=vmin, vmax=vmax)
         ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Frequency (Hz)')
@@ -432,9 +435,9 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
                     f'Total Events: {window_data["total_events_all_rats"]}, '
                     f'Sessions: {window_data["total_sessions_all_rats"]}')
         
-        # Set y-axis ticks to show first, last, and selected intermediate frequencies
-        # Use all frequency positions for ticks but only label selected ones
-        ax.set_yticks(frequencies)
+        # Set y-axis ticks to show frequencies on log scale
+        # Create tick positions at log-frequency values
+        ax.set_yticks(log_frequencies)
         
         # Create labels array with empty strings for most frequencies
         freq_labels = [''] * len(frequencies)
@@ -492,17 +495,19 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
             spectrogram = individual_spectrograms[j]
             rat_id = rat_ids[j]
             
-            im = ax.pcolormesh(window_times, frequencies, spectrogram,
-                              shading='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
+            # Use log-frequency spacing for y-axis
+            log_frequencies = np.log10(frequencies)
+            im = ax.pcolormesh(window_times, log_frequencies, spectrogram,
+                              shading='auto', cmap='viridis', vmin=vmin, vmax=vmax)
             ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
             ax.set_xlabel('Time (s)')
             ax.set_ylabel('Frequency (Hz)')
             ax.set_title(f'Rat {rat_id}\nEvents: {window_data["total_events_per_rat"][j]}, '
                         f'Sessions: {window_data["n_sessions_per_rat"][j]}')
             
-            # Set y-axis ticks to show first, last, and selected intermediate frequencies
-            # Use all frequency positions for ticks but only label selected ones
-            ax.set_yticks(frequencies)
+            # Set y-axis ticks to show frequencies on log scale
+            # Create tick positions at log-frequency values
+            ax.set_yticks(log_frequencies)
             
             # Create labels array with empty strings for most frequencies
             freq_labels = [''] * len(frequencies)
@@ -955,14 +960,14 @@ if __name__ == "__main__":
         
         # Or run single channel analysis as before 
         results = run_cross_rats_analysis(
-            roi="1",                    # ROI specification
+            roi="1,2,3",                    # ROI specification
             pkl_path="data/processed/all_eeg_data.pkl",  # Data file path
             freq_min=1.0,                     # Minimum frequency
             freq_max=45.0,                     # Maximum frequency
             n_freqs=40,                       # Number of frequencies
             window_duration=2.0,              # Event window duration
             n_cycles_factor=3.0,              # Cycles factor
-            rat_ids=["10501"],                     # None for all rats, or ["10501", "1055"] for specific rats
+            rat_ids=None,                     # None for all rats, or ["10501", "1055"] for specific rats
             save_path="results/cross_rats",   # Save directory
             show_plots=False,                 # Show plots during processing
             method="mne"                      # Spectrogram method: "mne" (MNE-Python) or "cwt" (SciPy CWT)

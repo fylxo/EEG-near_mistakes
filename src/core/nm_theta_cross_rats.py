@@ -432,11 +432,30 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
                     f'Total Events: {window_data["total_events_all_rats"]}, '
                     f'Sessions: {window_data["total_sessions_all_rats"]}')
         
-        # Set y-axis ticks to show actual frequency values
-        freq_step = max(1, len(frequencies) // 10)
-        freq_ticks = frequencies[::freq_step]
-        ax.set_yticks(freq_ticks)
-        ax.set_yticklabels([f'{f:.1f}' for f in freq_ticks])
+        # Set y-axis ticks to show first, last, and selected intermediate frequencies
+        # Use all frequency positions for ticks but only label selected ones
+        ax.set_yticks(frequencies)
+        
+        # Create labels array with empty strings for most frequencies
+        freq_labels = [''] * len(frequencies)
+        
+        # Always show first and last frequency
+        freq_labels[0] = f'{frequencies[0]:.1f}'
+        freq_labels[-1] = f'{frequencies[-1]:.1f}'
+        
+        # Show 5 intermediate frequencies, excluding ones too close to first/last
+        if len(frequencies) > 6:  # Need at least 7 frequencies for this approach
+            n_intermediate = 5
+            indices = np.linspace(1, len(frequencies)-2, n_intermediate, dtype=int)
+            
+            # Exclude indices too close to first (0) and last (-1)
+            min_distance = max(1, len(frequencies) // 5)  # At least 20% away from edges
+            
+            for idx in indices:
+                if idx >= min_distance and idx <= len(frequencies) - min_distance - 1:
+                    freq_labels[idx] = f'{frequencies[idx]:.1f}'
+        
+        ax.set_yticklabels(freq_labels)
         
         plt.colorbar(im, ax=ax, label='Z-score')
     
@@ -481,11 +500,30 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
             ax.set_title(f'Rat {rat_id}\nEvents: {window_data["total_events_per_rat"][j]}, '
                         f'Sessions: {window_data["n_sessions_per_rat"][j]}')
             
-            # Set y-axis ticks to show actual frequency values
-            freq_step = max(1, len(frequencies) // 10)
-            freq_ticks = frequencies[::freq_step]
-            ax.set_yticks(freq_ticks)
-            ax.set_yticklabels([f'{f:.1f}' for f in freq_ticks])
+            # Set y-axis ticks to show first, last, and selected intermediate frequencies
+            # Use all frequency positions for ticks but only label selected ones
+            ax.set_yticks(frequencies)
+            
+            # Create labels array with empty strings for most frequencies
+            freq_labels = [''] * len(frequencies)
+            
+            # Always show first and last frequency
+            freq_labels[0] = f'{frequencies[0]:.1f}'
+            freq_labels[-1] = f'{frequencies[-1]:.1f}'
+            
+            # Show 5 intermediate frequencies, excluding ones too close to first/last
+            if len(frequencies) > 6:  # Need at least 7 frequencies for this approach
+                n_intermediate = 5
+                indices = np.linspace(1, len(frequencies)-2, n_intermediate, dtype=int)
+                
+                # Exclude indices too close to first (0) and last (-1)
+                min_distance = max(1, len(frequencies) // 10)  # At least 10% away from edges
+                
+                for idx in indices:
+                    if idx >= min_distance and idx <= len(frequencies) - min_distance - 1:
+                        freq_labels[idx] = f'{frequencies[idx]:.1f}'
+            
+            ax.set_yticklabels(freq_labels)
             
             plt.colorbar(im, ax=ax, label='Z-score')
         
@@ -917,14 +955,14 @@ if __name__ == "__main__":
         
         # Or run single channel analysis as before 
         results = run_cross_rats_analysis(
-            roi="1,2,3",                    # ROI specification
+            roi="1",                    # ROI specification
             pkl_path="data/processed/all_eeg_data.pkl",  # Data file path
             freq_min=1.0,                     # Minimum frequency
             freq_max=45.0,                     # Maximum frequency
             n_freqs=40,                       # Number of frequencies
             window_duration=2.0,              # Event window duration
             n_cycles_factor=3.0,              # Cycles factor
-            rat_ids=None,                     # None for all rats, or ["rat1", "rat2"] for specific rats
+            rat_ids=["10501"],                     # None for all rats, or ["10501", "1055"] for specific rats
             save_path="results/cross_rats",   # Save directory
             show_plots=False,                 # Show plots during processing
             method="mne"                      # Spectrogram method: "mne" (MNE-Python) or "cwt" (SciPy CWT)

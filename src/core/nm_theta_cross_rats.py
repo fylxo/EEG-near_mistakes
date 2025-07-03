@@ -15,6 +15,7 @@ import json
 import gc
 import argparse
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Optional, Union
 from datetime import datetime
@@ -26,8 +27,136 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Import the run_analysis function from nm_theta_analyzer
 from nm_theta_analyzer import run_analysis
 
+# Constants for rat 9442 special handling
+RAT_9442_32_CHANNEL_SESSIONS = ['070419', '080419', '090419', '190419']
+RAT_9442_20_CHANNEL_ELECTRODES = [10, 11, 12, 13, 14, 15, 16, 19, 1, 24, 25, 29, 2, 3, 4, 5, 6, 7, 8, 9]
 
-def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False, verbose: bool = True) -> List[str]:
+
+def load_electrode_mappings(mapping_file: str = 'data/config/consistent_electrode_mappings.csv') -> pd.DataFrame:
+    """
+    Load electrode mappings from CSV file.
+    
+    Parameters:
+    -----------
+    mapping_file : str
+        Path to the electrode mappings CSV file
+        
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame with rat_id as index and electrode mappings
+    """
+    df = pd.read_csv(mapping_file)
+    return df.set_index('rat_id')
+
+
+def get_electrode_numbers_from_roi(roi_or_channels: Union[str, List[int]], 
+                                   mapping_df: pd.DataFrame,
+                                   rat_id: str) -> Union[List[int], str]:
+    """
+    Convert ROI specification to electrode numbers using the mapping.
+    
+    Parameters:
+    -----------
+    roi_or_channels : Union[str, List[int]]
+        ROI specification ("frontal", "hippocampus") or electrode numbers
+    mapping_df : pd.DataFrame
+        Electrode mappings DataFrame
+    rat_id : str
+        Rat ID for mapping lookup
+        
+    Returns:
+    --------
+    Union[List[int], str]
+        List of electrode numbers, or ROI string if ROI mapping not implemented
+    """
+    if isinstance(roi_or_channels, list):
+        return roi_or_channels
+    
+    if roi_or_channels.replace(',', '').replace(' ', '').isdigit():
+        # It's a comma-separated list of channels
+        return [int(ch.strip()) for ch in roi_or_channels.split(',')]
+    
+    # It's a ROI name - would need additional mapping logic
+    # For now, return the raw specification
+    return roi_or_channels
+
+
+def check_rat_9442_compatibility(roi_or_channels: Union[str, List[int]], 
+                                mapping_df: pd.DataFrame,
+                                verbose: bool = True) -> bool:
+    """
+    Check if the requested ROI/channels are compatible with rat 9442's 20-channel sessions.
+    
+    Parameters:
+    -----------
+    roi_or_channels : Union[str, List[int]]
+        ROI specification or electrode numbers
+    mapping_df : pd.DataFrame
+        Electrode mappings DataFrame
+    verbose : bool
+        Whether to print compatibility info
+        
+    Returns:
+    --------
+    bool
+        True if compatible, False otherwise
+    """
+    try:
+        # Get electrode numbers for the requested ROI/channels
+        requested_electrodes = get_electrode_numbers_from_roi(roi_or_channels, mapping_df, '9442')
+        
+        # If it's a string ROI that couldn't be converted, assume it's compatible for now
+        if isinstance(requested_electrodes, str):
+            if verbose:
+                print(f"  ROI '{requested_electrodes}' - assuming compatible (ROI mapping not implemented)")
+            return True
+        
+        # Get available electrodes from the CSV mapping for rat 9442
+        # Note: rat_id in CSV is stored as int, not string
+        rat_id_int = 9442
+        if rat_id_int not in mapping_df.index:
+            if verbose:
+                print(f"  ❌ Rat 9442 not found in electrode mappings")
+            return False
+        
+        rat_9442_mapping = mapping_df.loc[rat_id_int]
+        available_electrodes = []
+        
+        for col in rat_9442_mapping.index:
+            if col.startswith('ch_'):
+                electrode_value = rat_9442_mapping[col]
+                if pd.notna(electrode_value) and electrode_value != 'None':
+                    try:
+                        available_electrodes.append(int(electrode_value))
+                    except (ValueError, TypeError):
+                        continue
+        
+        available_electrodes_set = set(available_electrodes)
+        requested_electrodes_set = set(requested_electrodes)
+        
+        if verbose:
+            print(f"  Available electrodes from CSV for rat 9442: {sorted(available_electrodes)}")
+        
+        missing_electrodes = requested_electrodes_set - available_electrodes_set
+        
+        if missing_electrodes:
+            if verbose:
+                print(f"  ❌ Rat 9442 incompatible - electrodes not in CSV mapping: {sorted(missing_electrodes)}")
+            return False
+        else:
+            if verbose:
+                print(f"  ✓ Rat 9442 compatible - all electrodes {sorted(requested_electrodes)} found in CSV mapping")
+            return True
+            
+    except Exception as e:
+        if verbose:
+            print(f"  ⚠️  Error checking rat 9442 compatibility: {e}")
+        return False
+
+
+def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False, verbose: bool = True, 
+                     roi_or_channels: Optional[Union[str, List[int]]] = None) -> List[str]:
     """
     Discover all unique rat IDs from the dataset.
     
@@ -39,6 +168,8 @@ def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False, verbo
         Whether to exclude rats with 20 channels (default: False - removed validation)
     verbose : bool
         Whether to print discovery progress (default: True)
+    roi_or_channels : Optional[Union[str, List[int]]]
+        ROI specification to check compatibility with rat 9442 (default: None)
         
     Returns:
     --------
@@ -62,23 +193,76 @@ def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False, verbo
     if verbose:
         print(f"✓ Found {len(rat_ids_list)} unique rats: {rat_ids_list}")
     
-    # Exclude rat 9442 specifically (has 20 channels)
+    # Handle rat 9442 special case
+    excluded_rats = []
     if '9442' in rat_ids_list:
-        rat_ids_list.remove('9442')
-        if verbose:
-            print(f"❌ Excluding rat 9442 (20 channels)")
+        if roi_or_channels is not None:
+            # Load electrode mappings and check compatibility
+            try:
+                mapping_df = load_electrode_mappings()
+                if verbose:
+                    print(f"\n🔍 Checking rat 9442 compatibility with requested ROI/channels...")
+                
+                is_compatible = check_rat_9442_compatibility(roi_or_channels, mapping_df, verbose)
+                
+                if not is_compatible:
+                    rat_ids_list.remove('9442')
+                    excluded_rats.append('9442')
+                    if verbose:
+                        print(f"❌ Excluding rat 9442 (incompatible with requested ROI/channels)")
+                else:
+                    if verbose:
+                        print(f"✓ Including rat 9442 (compatible with requested ROI/channels)")
+                        
+            except Exception as e:
+                if verbose:
+                    print(f"⚠️  Error checking rat 9442 compatibility: {e}")
+                    print(f"❌ Excluding rat 9442 (compatibility check failed)")
+                rat_ids_list.remove('9442')
+                excluded_rats.append('9442')
+        else:
+            # If no ROI specified, exclude rat 9442 by default
+            rat_ids_list.remove('9442')
+            excluded_rats.append('9442')
+            if verbose:
+                print(f"❌ Excluding rat 9442 (no ROI specified for compatibility check)")
     
     if verbose:
         print(f"\n📊 Final rat selection:")
-        print(f"  Total rats found: {len(rat_ids_list) + 1}")  # +1 for the excluded rat
+        print(f"  Total rats found: {len(rat_ids_list) + len(excluded_rats)}")
         print(f"  Rats to process: {len(rat_ids_list)}")
-        print(f"  Excluded rats: ['9442']")
+        if excluded_rats:
+            print(f"  Excluded rats: {excluded_rats}")
+        else:
+            print(f"  Excluded rats: None")
     
     # Clean up memory
     del all_data
     gc.collect()
     
     return rat_ids_list
+
+
+def get_rat_9442_mapping_for_session(session_id: str, mapping_df: pd.DataFrame) -> str:
+    """
+    Get the appropriate rat mapping for rat 9442 based on session type.
+    
+    Parameters:
+    -----------
+    session_id : str
+        Session ID (e.g., '070419')
+    mapping_df : pd.DataFrame
+        Electrode mappings DataFrame
+        
+    Returns:
+    --------
+    str
+        Rat ID to use for mapping ('9151' for 32-channel sessions, '9442' for 20-channel sessions)
+    """
+    if session_id in RAT_9442_32_CHANNEL_SESSIONS:
+        return '9151'  # Use rat 9151's mapping for 32-channel sessions
+    else:
+        return '9442'  # Use rat 9442's mapping for 20-channel sessions
 
 
 def process_single_rat_multi_session(
@@ -132,11 +316,30 @@ def process_single_rat_multi_session(
     if verbose:
         print(f"\n🐀 Processing rat {rat_id} - Multi-session analysis")
         print(f"    Method: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
+        if rat_id == '9442':
+            print(f"    Special handling: Mixed 32/20 channel sessions")
         print("=" * 60)
     
     try:
         # Create save path for this rat
         rat_save_path = os.path.join(base_save_path, f'rat_{rat_id}_multi_session_{method}')
+        
+        # Special handling for rat 9442
+        if rat_id == '9442':
+            # Load electrode mappings for session-specific mapping
+            try:
+                mapping_df = load_electrode_mappings()
+                if verbose:
+                    print(f"    Loaded electrode mappings for rat 9442 special handling")
+                    print(f"    32-channel sessions: {RAT_9442_32_CHANNEL_SESSIONS}")
+                    print(f"    20-channel sessions: All others")
+                    print(f"    ⚠️  NOTE: Session-specific mapping requires modification of underlying analysis functions")
+            except Exception as e:
+                if verbose:
+                    print(f"    ⚠️  Failed to load electrode mappings: {e}")
+                mapping_df = None
+        else:
+            mapping_df = None
         
         if method == 'mne':
             # Use nm_theta_analyzer for MNE-based analysis
@@ -646,8 +849,32 @@ def run_cross_rats_analysis(
     if rat_ids:
         if verbose:
             print(f"Using specified rat IDs: {rat_ids}")
+        
+        # Check compatibility for rat 9442 even when manually specified
+        if '9442' in rat_ids:
+            try:
+                mapping_df = load_electrode_mappings()
+                if verbose:
+                    print(f"\n🔍 Checking rat 9442 compatibility with requested ROI/channels...")
+                
+                is_compatible = check_rat_9442_compatibility(roi, mapping_df, verbose)
+                
+                if not is_compatible:
+                    rat_ids = [r for r in rat_ids if r != '9442']
+                    if verbose:
+                        print(f"❌ Removing rat 9442 from analysis (incompatible with requested ROI/channels)")
+                    if not rat_ids:
+                        raise ValueError("No compatible rats remaining for analysis")
+                        
+            except Exception as e:
+                if verbose:
+                    print(f"⚠️  Error checking rat 9442 compatibility: {e}")
+                    print(f"❌ Removing rat 9442 from analysis (compatibility check failed)")
+                rat_ids = [r for r in rat_ids if r != '9442']
+                if not rat_ids:
+                    raise ValueError("No compatible rats remaining for analysis")
     else:
-        rat_ids = discover_rat_ids(pkl_path, verbose=verbose)
+        rat_ids = discover_rat_ids(pkl_path, verbose=verbose, roi_or_channels=roi)
     
     # Process each rat individually
     rat_results = {}
@@ -1040,7 +1267,7 @@ if __name__ == "__main__":
             n_freqs=40,                       # Number of frequencies
             window_duration=2.0,              # Event window duration
             n_cycles_factor=3.0,              # Cycles factor
-            rat_ids=["10501"],                     # None for all rats, or ["10501", "1055"] for specific rats
+            rat_ids=None,                     # None for all rats, or ["10501", "1055"] for specific rats
             save_path="results/cross_rats",   # Save directory
             show_plots=False,                 # Show plots during processing
             method="mne",                     # Spectrogram method: "mne" (MNE-Python) or "cwt" (SciPy CWT)

@@ -27,7 +27,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from nm_theta_analyzer import run_analysis
 
 
-def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False) -> List[str]:
+def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False, verbose: bool = True) -> List[str]:
     """
     Discover all unique rat IDs from the dataset.
     
@@ -37,14 +37,17 @@ def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False) -> Li
         Path to the main EEG data file
     exclude_20_channel_rats : bool
         Whether to exclude rats with 20 channels (default: False - removed validation)
+    verbose : bool
+        Whether to print discovery progress (default: True)
         
     Returns:
     --------
     rat_ids : List[str]
         List of unique rat IDs found in the dataset
     """
-    print(f"🔍 Discovering rat IDs from {pkl_path}")
-    print("Loading data to scan for rat IDs...")
+    if verbose:
+        print(f"🔍 Discovering rat IDs from {pkl_path}")
+        print("Loading data to scan for rat IDs...")
     
     with open(pkl_path, 'rb') as f:
         all_data = pickle.load(f)
@@ -56,17 +59,20 @@ def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False) -> Li
             rat_ids.add(str(rat_id))
     
     rat_ids_list = sorted(list(rat_ids))
-    print(f"✓ Found {len(rat_ids_list)} unique rats: {rat_ids_list}")
+    if verbose:
+        print(f"✓ Found {len(rat_ids_list)} unique rats: {rat_ids_list}")
     
     # Exclude rat 9442 specifically (has 20 channels)
     if '9442' in rat_ids_list:
         rat_ids_list.remove('9442')
-        print(f"❌ Excluding rat 9442 (20 channels)")
+        if verbose:
+            print(f"❌ Excluding rat 9442 (20 channels)")
     
-    print(f"\n📊 Final rat selection:")
-    print(f"  Total rats found: {len(rat_ids_list) + 1}")  # +1 for the excluded rat
-    print(f"  Rats to process: {len(rat_ids_list)}")
-    print(f"  Excluded rats: ['9442']")
+    if verbose:
+        print(f"\n📊 Final rat selection:")
+        print(f"  Total rats found: {len(rat_ids_list) + 1}")  # +1 for the excluded rat
+        print(f"  Rats to process: {len(rat_ids_list)}")
+        print(f"  Excluded rats: ['9442']")
     
     # Clean up memory
     del all_data
@@ -85,7 +91,8 @@ def process_single_rat_multi_session(
     n_cycles_factor: float = 3.0,
     base_save_path: str = 'results/cross_rats',
     show_plots: bool = False,
-    method: str = 'mne'
+    method: str = 'mne',
+    verbose: bool = True
 ) -> Tuple[str, Optional[Dict]]:
     """
     Process multi-session analysis for a single rat using nm_theta_analyzer.
@@ -112,6 +119,8 @@ def process_single_rat_multi_session(
         Whether to show plots during processing
     method : str
         Spectrogram calculation method: 'mne' (MNE-Python) or 'cwt' (SciPy CWT)
+    verbose : bool
+        Whether to print detailed progress information (default: True)
         
     Returns:
     --------
@@ -120,9 +129,10 @@ def process_single_rat_multi_session(
     results : Optional[Dict]
         Multi-session results for the rat, or None if failed
     """
-    print(f"\n🐀 Processing rat {rat_id} - Multi-session analysis")
-    print(f"    Method: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
-    print("=" * 60)
+    if verbose:
+        print(f"\n🐀 Processing rat {rat_id} - Multi-session analysis")
+        print(f"    Method: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
+        print("=" * 60)
     
     try:
         # Create save path for this rat
@@ -173,9 +183,10 @@ def process_single_rat_multi_session(
         else:
             raise ValueError(f"Unknown method: {method}. Use 'mne' or 'cwt'.")
         
-        print(f"✓ Successfully processed rat {rat_id}")
-        print(f"  Sessions analyzed: {results.get('n_sessions_analyzed', 'unknown')}")
-        print(f"  Results saved to: {rat_save_path}")
+        if verbose:
+            print(f"✓ Successfully processed rat {rat_id}")
+            print(f"  Sessions analyzed: {results.get('n_sessions_analyzed', 'unknown')}")
+            print(f"  Results saved to: {rat_save_path}")
         
         # Force garbage collection
         gc.collect()
@@ -183,9 +194,10 @@ def process_single_rat_multi_session(
         return rat_id, results
         
     except Exception as e:
-        print(f"❌ Error processing rat {rat_id}: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        if verbose:
+            print(f"❌ Error processing rat {rat_id}: {str(e)}")
+            import traceback
+            traceback.print_exc()
         return rat_id, None
 
 
@@ -193,7 +205,8 @@ def aggregate_cross_rats_results(
     rat_results: Dict[str, Dict],
     roi_specification: Union[str, List[int]],
     freq_range: Tuple[float, float],
-    save_path: str
+    save_path: str,
+    verbose: bool = True
 ) -> Dict:
     """
     Aggregate multi-session results across all rats.
@@ -208,14 +221,17 @@ def aggregate_cross_rats_results(
         Frequency range used
     save_path : str
         Path to save aggregated results
+    verbose : bool
+        Whether to print detailed progress information (default: True)
         
     Returns:
     --------
     aggregated_results : Dict
         Cross-rats aggregated results
     """
-    print(f"\n📊 Aggregating results across {len(rat_results)} rats")
-    print("=" * 60)
+    if verbose:
+        print(f"\n📊 Aggregating results across {len(rat_results)} rats")
+        print("=" * 60)
     
     # Filter out failed results
     valid_results = {rat_id: results for rat_id, results in rat_results.items() if results is not None}
@@ -224,7 +240,8 @@ def aggregate_cross_rats_results(
     if n_valid_rats == 0:
         raise ValueError("No valid rat results to aggregate")
     
-    print(f"Valid results from {n_valid_rats} rats: {list(valid_results.keys())}")
+    if verbose:
+        print(f"Valid results from {n_valid_rats} rats: {list(valid_results.keys())}")
     
     # Get reference data from first valid result
     first_result = next(iter(valid_results.values()))
@@ -241,15 +258,18 @@ def aggregate_cross_rats_results(
     
     # Collect spectrograms from all rats
     for rat_id, results in valid_results.items():
-        print(f"Processing results from rat {rat_id}")
-        
-        # Debug: Print available keys
-        print(f"  Available keys in results: {list(results.keys())}")
-        if 'averaged_windows' in results:
-            print(f"  NM sizes in averaged_windows: {list(results['averaged_windows'].keys())}")
-        else:
-            print(f"  ❌ ERROR: 'averaged_windows' key not found!")
-            print(f"  Available keys: {list(results.keys())}")
+        if verbose:
+            print(f"Processing results from rat {rat_id}")
+            
+            # Debug: Print available keys
+            print(f"  Available keys in results: {list(results.keys())}")
+            if 'averaged_windows' in results:
+                print(f"  NM sizes in averaged_windows: {list(results['averaged_windows'].keys())}")
+            else:
+                print(f"  ❌ ERROR: 'averaged_windows' key not found!")
+                print(f"  Available keys: {list(results.keys())}")
+                continue
+        elif 'averaged_windows' not in results:
             continue
         
         for nm_size, window_data in results['averaged_windows'].items():
@@ -266,8 +286,9 @@ def aggregate_cross_rats_results(
     for nm_size, data in aggregated_windows.items():
         spectrograms = np.array(data['spectrograms'])  # Shape: (n_rats, n_freqs, n_times)
         
-        print(f"NM size {nm_size}: {spectrograms.shape[0]} rats, "
-              f"spectrogram shape: {spectrograms.shape[1:]}") 
+        if verbose:
+            print(f"NM size {nm_size}: {spectrograms.shape[0]} rats, "
+                  f"spectrogram shape: {spectrograms.shape[1:]}") 
         
         # Average across rats
         avg_spectrogram = np.mean(spectrograms, axis=0)
@@ -314,7 +335,8 @@ def aggregate_cross_rats_results(
     with open(results_file, 'wb') as f:
         pickle.dump(aggregated_results, f)
     
-    print(f"✓ Cross-rats results saved to: {results_file}")
+    if verbose:
+        print(f"✓ Cross-rats results saved to: {results_file}")
     
     # Save summary statistics
     summary_file = os.path.join(save_path, 'cross_rats_summary.json')
@@ -334,7 +356,8 @@ def aggregate_cross_rats_results(
     with open(summary_file, 'w') as f:
         json.dump(summary_data, f, indent=2)
     
-    print(f"✓ Summary statistics saved to: {summary_file}")
+    if verbose:
+        print(f"✓ Summary statistics saved to: {summary_file}")
     
     return aggregated_results
 
@@ -374,7 +397,7 @@ def calculate_color_limits(spectrograms: List[np.ndarray], percentile: float = 9
     return vmin, vmax
 
 
-def create_cross_rats_visualizations(results: Dict, save_path: str):
+def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: bool = True):
     """
     Create comprehensive visualizations for cross-rats results.
     
@@ -384,9 +407,12 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
         Cross-rats aggregated results
     save_path : str
         Directory to save visualizations
+    verbose : bool
+        Whether to print visualization progress (default: True)
     """
-    print(f"\n📈 Creating cross-rats visualizations")
-    print("=" * 60)
+    if verbose:
+        print(f"\n📈 Creating cross-rats visualizations")
+        print("=" * 60)
     
     os.makedirs(save_path, exist_ok=True)
     
@@ -399,7 +425,8 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
     n_nm_sizes = len(nm_sizes)
     
     if n_nm_sizes == 0:
-        print("⚠️  No NM sizes to plot")
+        if verbose:
+            print("⚠️  No NM sizes to plot")
         return
     
     # Calculate color limits from all spectrograms
@@ -410,7 +437,8 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
         all_spectrograms.extend(window_data['individual_spectrograms'])
     
     vmin, vmax = calculate_color_limits(all_spectrograms)
-    print(f"📊 Color map limits: [{vmin}, {vmax}] (calculated from data)")
+    if verbose:
+        print(f"📊 Color map limits: [{vmin}, {vmax}] (calculated from data)")
     
     fig, axes = plt.subplots(n_nm_sizes, 1, figsize=(10, 5 * n_nm_sizes))
     if n_nm_sizes == 1:
@@ -474,7 +502,8 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
     # Save plot
     plot_file = os.path.join(save_path, 'cross_rats_spectrograms.png')
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-    print(f"✓ Spectrograms saved to: {plot_file}")
+    if verbose:
+        print(f"✓ Spectrograms saved to: {plot_file}")
     
     plt.show()
     
@@ -543,7 +572,8 @@ def create_cross_rats_visualizations(results: Dict, save_path: str):
         
         individual_plot_file = os.path.join(save_path, f'individual_rats_nm_{nm_size}.png')
         plt.savefig(individual_plot_file, dpi=300, bbox_inches='tight')
-        print(f"✓ Individual rats plot saved to: {individual_plot_file}")
+        if verbose:
+            print(f"✓ Individual rats plot saved to: {individual_plot_file}")
         
         plt.show()
 
@@ -559,7 +589,8 @@ def run_cross_rats_analysis(
     rat_ids: Optional[List[str]] = None,
     save_path: str = 'results/cross_rats',
     show_plots: bool = False,
-    method: str = 'mne'
+    method: str = 'mne',
+    verbose: bool = True
 ) -> Dict:
     """
     Run cross-rats NM theta analysis with direct parameter specification.
@@ -588,21 +619,24 @@ def run_cross_rats_analysis(
         Show plots during processing
     method : str
         Spectrogram calculation method: 'mne' (MNE-Python) or 'cwt' (SciPy CWT)
+    verbose : bool
+        Whether to print detailed progress information (default: True)
         
     Returns:
     --------
     aggregated_results : Dict
         Cross-rats aggregated results
     """
-    print("🧠 Cross-Rats NM Theta Analysis")
-    print("=" * 80)
-    print(f"Data file: {pkl_path}")
-    print(f"ROI: {roi}")
-    print(f"Frequency range: {freq_min}-{freq_max} Hz ({n_freqs} freqs)")
-    print(f"Window duration: {window_duration}s")
-    print(f"Method: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
-    print(f"Save path: {save_path}")
-    print("=" * 80)
+    if verbose:
+        print("🧠 Cross-Rats NM Theta Analysis")
+        print("=" * 80)
+        print(f"Data file: {pkl_path}")
+        print(f"ROI: {roi}")
+        print(f"Frequency range: {freq_min}-{freq_max} Hz ({n_freqs} freqs)")
+        print(f"Window duration: {window_duration}s")
+        print(f"Method: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
+        print(f"Save path: {save_path}")
+        print("=" * 80)
     
     # Validate method parameter
     if method not in ['mne', 'cwt']:
@@ -610,12 +644,16 @@ def run_cross_rats_analysis(
     
     # Discover rat IDs
     if rat_ids:
-        print(f"Using specified rat IDs: {rat_ids}")
+        if verbose:
+            print(f"Using specified rat IDs: {rat_ids}")
     else:
-        rat_ids = discover_rat_ids(pkl_path)
+        rat_ids = discover_rat_ids(pkl_path, verbose=verbose)
     
     # Process each rat individually
     rat_results = {}
+    failed_rats = []
+    error_details = {}
+    successful_rats = []
     
     for rat_id in rat_ids:
         rat_id_str, results = process_single_rat_multi_session(
@@ -628,10 +666,18 @@ def run_cross_rats_analysis(
             n_cycles_factor=n_cycles_factor,
             base_save_path=save_path,
             show_plots=show_plots,
-            method=method
+            method=method,
+            verbose=verbose
         )
         
         rat_results[rat_id_str] = results
+        
+        # Track success/failure
+        if results is None:
+            failed_rats.append(rat_id_str)
+            error_details[rat_id_str] = "Processing failed - see logs above for details"
+        else:
+            successful_rats.append(rat_id_str)
         
         # Force garbage collection after each rat
         gc.collect()
@@ -641,25 +687,46 @@ def run_cross_rats_analysis(
         rat_results=rat_results,
         roi_specification=roi,
         freq_range=(freq_min, freq_max),
-        save_path=save_path
+        save_path=save_path,
+        verbose=verbose
     )
     
     # Create visualizations
     create_cross_rats_visualizations(
         results=aggregated_results,
-        save_path=save_path
+        save_path=save_path,
+        verbose=verbose
     )
     
-    print("\n✅ Cross-rats analysis completed successfully!")
-    print(f"Results saved to: {save_path}")
+    # Print analysis completion and error summary
+    print("\n" + "=" * 80)
+    print("📊 ANALYSIS SUMMARY")
+    print("=" * 80)
+    print(f"Total rats attempted: {len(rat_ids)}")
+    print(f"Successfully processed: {len(successful_rats)}")
+    print(f"Failed to process: {len(failed_rats)}")
     
-    # Print summary
-    print(f"\nSummary:")
-    print(f"  Method used: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
-    print(f"  Rats processed: {aggregated_results['n_rats']}")
-    print(f"  Rat IDs: {aggregated_results['rat_ids']}")
-    print(f"  NM sizes analyzed: {[float(key) for key in aggregated_results['averaged_windows'].keys()]}")
-    print(f"  ROI channels: {aggregated_results['roi_channels']}")
+    if successful_rats:
+        print(f"\n✅ Successful rats: {successful_rats}")
+    
+    if failed_rats:
+        print(f"\n❌ Failed rats: {failed_rats}")
+        print("\n🔍 Error details:")
+        for rat_id, error in error_details.items():
+            print(f"  • Rat {rat_id}: {error}")
+    
+    if len(successful_rats) > 0:
+        print("\n✅ Cross-rats analysis completed successfully!")
+        if verbose:
+            print(f"Results saved to: {save_path}")
+            print(f"\nDetailed Summary:")
+            print(f"  Method used: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
+            print(f"  Rats successfully processed: {aggregated_results['n_rats']}")
+            print(f"  Successful rat IDs: {aggregated_results['rat_ids']}")
+            print(f"  NM sizes analyzed: {[float(key) for key in aggregated_results['averaged_windows'].keys()]}")
+            print(f"  ROI channels: {aggregated_results['roi_channels']}")
+    else:
+        print("\n❌ Analysis failed - no rats were successfully processed!")
     
     return aggregated_results
 
@@ -717,6 +784,8 @@ Examples:
                        help='Base directory for saving results')
     parser.add_argument('--show_plots', action='store_true',
                        help='Show plots during processing')
+    parser.add_argument('--quiet', action='store_true',
+                       help='Suppress detailed progress output (opposite of verbose)')
     
     args = parser.parse_args()
     
@@ -724,6 +793,9 @@ Examples:
     rat_ids = None
     if args.rat_ids:
         rat_ids = [r.strip() for r in args.rat_ids.split(',')]
+    
+    # Parse verbose flag (opposite of quiet)
+    verbose = not args.quiet
     
     # Run the analysis
     return run_cross_rats_analysis(
@@ -737,7 +809,8 @@ Examples:
         rat_ids=rat_ids,
         save_path=args.save_path,
         show_plots=args.show_plots,
-        method=args.method
+        method=args.method,
+        verbose=verbose
     )
 
 
@@ -967,8 +1040,9 @@ if __name__ == "__main__":
             n_freqs=40,                       # Number of frequencies
             window_duration=2.0,              # Event window duration
             n_cycles_factor=3.0,              # Cycles factor
-            rat_ids=None,                     # None for all rats, or ["10501", "1055"] for specific rats
+            rat_ids=["10501"],                     # None for all rats, or ["10501", "1055"] for specific rats
             save_path="results/cross_rats",   # Save directory
             show_plots=False,                 # Show plots during processing
-            method="mne"                      # Spectrogram method: "mne" (MNE-Python) or "cwt" (SciPy CWT)
+            method="mne",                     # Spectrogram method: "mne" (MNE-Python) or "cwt" (SciPy CWT)
+            verbose=False                      # Print detailed progress information
         )

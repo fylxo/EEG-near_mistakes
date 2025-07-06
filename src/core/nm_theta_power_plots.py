@@ -9,6 +9,7 @@ Author: Generated for EEG near-mistake theta power analysis
 """
 
 import os
+import sys
 import pickle
 import json
 import numpy as np
@@ -16,9 +17,15 @@ import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Optional
 import argparse
 
+# Add parent directory to path for config imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import configuration
+from config import AnalysisConfig, DataConfig, PlottingConfig
+
 
 def extract_theta_power(spectrograms: np.ndarray, frequencies: np.ndarray, 
-                        theta_range: Tuple[float, float] = (4.0, 8.0),
+                        theta_range: Tuple[float, float] = None,
                         time_window: Optional[Tuple[float, float]] = None,
                         window_times: Optional[np.ndarray] = None) -> np.ndarray:
     """
@@ -30,8 +37,8 @@ def extract_theta_power(spectrograms: np.ndarray, frequencies: np.ndarray,
         Array of spectrograms with shape (n_rats, n_freqs, n_times)
     frequencies : np.ndarray
         Frequency values for each frequency bin
-    theta_range : Tuple[float, float]
-        Frequency range for theta band (default: 4-8 Hz)
+    theta_range : Tuple[float, float], optional
+        Frequency range for theta band (default: from AnalysisConfig)
     time_window : Optional[Tuple[float, float]]
         Time window to extract power from (default: None for all times)
     window_times : Optional[np.ndarray]
@@ -42,6 +49,10 @@ def extract_theta_power(spectrograms: np.ndarray, frequencies: np.ndarray,
     theta_power : np.ndarray
         Theta power values with shape (n_rats,) - one value per rat
     """
+    # Apply configuration default if not provided
+    if theta_range is None:
+        theta_range = AnalysisConfig.get_theta_range()
+    
     # Find frequency indices for theta band
     theta_mask = (frequencies >= theta_range[0]) & (frequencies <= theta_range[1])
     
@@ -67,9 +78,9 @@ def extract_theta_power(spectrograms: np.ndarray, frequencies: np.ndarray,
 
 
 def create_theta_power_plots(results: Dict, save_path: str, 
-                           theta_range: Tuple[float, float] = (4.0, 8.0),
+                           theta_range: Tuple[float, float] = None,
                            time_window: Optional[Tuple[float, float]] = None,
-                           ylim: Optional[Tuple[float, float]] = (-0.3, 0.3),
+                           ylim: Optional[Tuple[float, float]] = None,
                            verbose: bool = True):
     """
     Create theta band power plots with mean ± 1 SE for different NM types.
@@ -80,15 +91,21 @@ def create_theta_power_plots(results: Dict, save_path: str,
         Cross-rats aggregated results
     save_path : str
         Directory to save plots
-    theta_range : Tuple[float, float]
-        Frequency range for theta band (default: 4-8 Hz)
+    theta_range : Tuple[float, float], optional
+        Frequency range for theta band (default: from AnalysisConfig)
     time_window : Optional[Tuple[float, float]]
         Time window to extract power from (default: None for all times)
-    ylim : Optional[Tuple[float, float]]
-        Y-axis limits for the plot (default: (-0.3, 0.3))
+    ylim : Optional[Tuple[float, float]], optional
+        Y-axis limits for the plot (default: from PlottingConfig)
     verbose : bool
         Whether to print progress information
     """
+    # Apply configuration defaults
+    if theta_range is None:
+        theta_range = AnalysisConfig.get_theta_range()
+    if ylim is None:
+        ylim = PlottingConfig.get_theta_power_ylim()
+    
     if verbose:
         print(f"\n📊 Creating theta power plots (mean ± 1 SE)")
         print(f"Theta range: {theta_range[0]}-{theta_range[1]} Hz")
@@ -132,17 +149,21 @@ def create_theta_power_plots(results: Dict, save_path: str,
         nm_ses.append(se_power)
     
     # Create the plot
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=PlottingConfig.get_figure_size('default'))
     
     # Create bar plot with error bars
-    bars = ax.bar(nm_types, nm_means, yerr=nm_ses, capsize=5, 
-                  color='skyblue', alpha=0.7, edgecolor='black')
+    bars = ax.bar(nm_types, nm_means, yerr=nm_ses, 
+                  capsize=PlottingConfig.BAR_CAPSIZE, 
+                  color=PlottingConfig.BAR_COLOR_DEFAULT, 
+                  alpha=PlottingConfig.BAR_ALPHA, 
+                  edgecolor=PlottingConfig.BAR_EDGE_COLOR)
     
     # Customize the plot
-    ax.set_xlabel('Near-Mistake Type', fontsize=12)
-    ax.set_ylabel('Theta Power (Z-score)', fontsize=12)
+    ax.set_xlabel('Near-Mistake Type', fontsize=PlottingConfig.AXIS_LABEL_FONTSIZE)
+    ax.set_ylabel('Theta Power (Z-score)', fontsize=PlottingConfig.AXIS_LABEL_FONTSIZE)
     ax.set_title(f'Theta Band Power by Near-Mistake Type\n'
-                f'Mean ± 1 SE (n={results["n_rats"]} rats)', fontsize=14)
+                f'Mean ± 1 SE (n={results["n_rats"]} rats)', 
+                fontsize=PlottingConfig.TITLE_FONTSIZE)
     
     # Set x-axis ticks to show NM types
     ax.set_xticks(nm_types)
@@ -155,20 +176,27 @@ def create_theta_power_plots(results: Dict, save_path: str,
     # Add value labels on bars
     for bar, mean_val, se_val in zip(bars, nm_means, nm_ses):
         height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height + se_val + 0.01,
-                f'{mean_val:.3f}', ha='center', va='bottom', fontsize=10)
+        ax.text(bar.get_x() + bar.get_width()/2., height + se_val + PlottingConfig.VALUE_LABEL_OFFSET,
+                f'{mean_val:.3f}', ha='center', va='bottom', 
+                fontsize=PlottingConfig.VALUE_LABEL_FONTSIZE)
     
     # Add grid for better readability
-    ax.grid(True, alpha=0.3)
+    if PlottingConfig.GRID_ENABLE:
+        ax.grid(True, alpha=PlottingConfig.GRID_ALPHA)
     
-    # Add ROI and frequency info
-    roi_str = f"ROI: {results['roi_specification']}"
-    freq_str = f"Theta: {theta_range[0]}-{theta_range[1]} Hz"
-    time_str = f"Time: {time_window[0]}-{time_window[1]} s" if time_window else "Time: All"
+    # Add ROI and frequency info using configuration
+    info_text = PlottingConfig.get_info_box_text(
+        roi=results['roi_specification'],
+        freq_range=theta_range,
+        time_window=time_window,
+        n_rats=results['n_rats']
+    )
     
-    ax.text(0.02, 0.98, f'{roi_str}\n{freq_str}\n{time_str}', 
-            transform=ax.transAxes, fontsize=10, verticalalignment='top',
-            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    ax.text(PlottingConfig.INFO_BOX_POSITION[0], PlottingConfig.INFO_BOX_POSITION[1], 
+            info_text, transform=ax.transAxes, 
+            fontsize=PlottingConfig.INFO_BOX_FONTSIZE,
+            verticalalignment=PlottingConfig.INFO_BOX_VERTICAL_ALIGNMENT,
+            bbox=PlottingConfig.INFO_BOX_STYLE)
     
     plt.tight_layout()
     
@@ -321,10 +349,10 @@ Examples:
                        help='Path to cross_rats_aggregated_results.pkl file')
     
     # Theta band parameters
-    parser.add_argument('--theta_min', type=float, default=4.0,
-                       help='Minimum theta frequency (Hz)')
-    parser.add_argument('--theta_max', type=float, default=8.0,
-                       help='Maximum theta frequency (Hz)')
+    parser.add_argument('--theta_min', type=float, default=AnalysisConfig.THETA_MIN_FREQ,
+                       help=f'Minimum theta frequency (Hz) (default: {AnalysisConfig.THETA_MIN_FREQ})')
+    parser.add_argument('--theta_max', type=float, default=AnalysisConfig.THETA_MAX_FREQ,
+                       help=f'Maximum theta frequency (Hz) (default: {AnalysisConfig.THETA_MAX_FREQ})')
     
     # Time window parameters
     parser.add_argument('--time_min', type=float, default=None,
@@ -333,10 +361,10 @@ Examples:
                        help='End time for power extraction (s)')
     
     # Plot parameters
-    parser.add_argument('--ylim_min', type=float, default=-0.3,
-                       help='Minimum y-axis limit (default: -0.3)')
-    parser.add_argument('--ylim_max', type=float, default=0.3,
-                       help='Maximum y-axis limit (default: 0.3)')
+    parser.add_argument('--ylim_min', type=float, default=PlottingConfig.THETA_POWER_YLIM_MIN,
+                       help=f'Minimum y-axis limit (default: {PlottingConfig.THETA_POWER_YLIM_MIN})')
+    parser.add_argument('--ylim_max', type=float, default=PlottingConfig.THETA_POWER_YLIM_MAX,
+                       help=f'Maximum y-axis limit (default: {PlottingConfig.THETA_POWER_YLIM_MAX})')
     
     # Output parameters
     parser.add_argument('--save_path', type=str, default=None,

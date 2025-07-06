@@ -24,6 +24,10 @@ from collections import defaultdict
 
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import configuration
+from config import AnalysisConfig, DataConfig, PlottingConfig
 
 # Import the run_analysis function from nm_theta_analyzer
 from nm_theta_analyzer import run_analysis
@@ -126,20 +130,23 @@ RAT_9442_32_CHANNEL_SESSIONS = ['070419', '080419', '090419', '190419']
 RAT_9442_20_CHANNEL_ELECTRODES = [10, 11, 12, 13, 14, 15, 16, 19, 1, 24, 25, 29, 2, 3, 4, 5, 6, 7, 8, 9]
 
 
-def load_electrode_mappings(mapping_file: str = 'data/config/consistent_electrode_mappings.csv') -> pd.DataFrame:
+def load_electrode_mappings(mapping_file: str = None) -> pd.DataFrame:
     """
     Load electrode mappings from CSV file.
     
     Parameters:
     -----------
-    mapping_file : str
-        Path to the electrode mappings CSV file
+    mapping_file : str, optional
+        Path to the electrode mappings CSV file (default: from DataConfig)
         
     Returns:
     --------
     pd.DataFrame
         DataFrame with rat_id as index and electrode mappings
     """
+    if mapping_file is None:
+        mapping_file = DataConfig.get_data_file_path(DataConfig.ELECTRODE_MAPPINGS_FILE)
+    
     df = pd.read_csv(mapping_file)
     return df.set_index('rat_id')
 
@@ -877,17 +884,17 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
 
 def run_cross_rats_analysis(
     roi: str,
-    pkl_path: str = 'data/processed/all_eeg_data.pkl',
-    freq_min: float = 3.0,
-    freq_max: float = 8.0,
-    n_freqs: int = 30,
-    window_duration: float = 1.0,
-    n_cycles_factor: float = 3.0,
+    pkl_path: str = None,
+    freq_min: float = None,
+    freq_max: float = None,
+    n_freqs: int = None,
+    window_duration: float = None,
+    n_cycles_factor: float = None,
     rat_ids: Optional[List[str]] = None,
-    save_path: str = 'results/cross_rats',
-    show_plots: bool = False,
-    method: str = 'mne',
-    verbose: bool = True
+    save_path: str = None,
+    show_plots: bool = None,
+    method: str = None,
+    verbose: bool = None
 ) -> Dict:
     """
     Run cross-rats NM theta analysis with direct parameter specification.
@@ -896,34 +903,56 @@ def run_cross_rats_analysis(
     -----------
     roi : str
         ROI name ("frontal", "hippocampus") or channels ("1,2,3")
-    pkl_path : str
-        Path to main EEG data file
-    freq_min : float
-        Minimum frequency (Hz)
-    freq_max : float
-        Maximum frequency (Hz)
-    n_freqs : int
-        Number of frequencies
-    window_duration : float
-        Event window duration (s)
-    n_cycles_factor : float
-        Cycles factor for spectrograms
+    pkl_path : str, optional
+        Path to main EEG data file (default: from DataConfig)
+    freq_min : float, optional
+        Minimum frequency (Hz) (default: from AnalysisConfig)
+    freq_max : float, optional
+        Maximum frequency (Hz) (default: from AnalysisConfig)
+    n_freqs : int, optional
+        Number of frequencies (default: from AnalysisConfig)
+    window_duration : float, optional
+        Event window duration (s) (default: from AnalysisConfig)
+    n_cycles_factor : float, optional
+        Cycles factor for spectrograms (default: from AnalysisConfig)
     rat_ids : Optional[List[str]]
         Specific rat IDs to process, None for all rats
-    save_path : str
-        Base directory for saving results
-    show_plots : bool
-        Show plots during processing
-    method : str
-        Spectrogram calculation method: 'mne' (MNE-Python) or 'cwt' (SciPy CWT)
-    verbose : bool
-        Whether to print detailed progress information (default: True)
+    save_path : str, optional
+        Base directory for saving results (default: from DataConfig)
+    show_plots : bool, optional
+        Show plots during processing (default: from AnalysisConfig)
+    method : str, optional
+        Spectrogram calculation method (default: from AnalysisConfig)
+    verbose : bool, optional
+        Whether to print detailed progress information (default: from AnalysisConfig)
         
     Returns:
     --------
     aggregated_results : Dict
         Cross-rats aggregated results
     """
+    # Apply configuration defaults for None values
+    if pkl_path is None:
+        pkl_path = DataConfig.get_data_file_path(DataConfig.MAIN_EEG_DATA_FILE)
+    if freq_min is None:
+        freq_min = AnalysisConfig.THETA_MIN_FREQ
+    if freq_max is None:
+        freq_max = AnalysisConfig.THETA_MAX_FREQ
+    if n_freqs is None:
+        n_freqs = AnalysisConfig.N_FREQS_DEFAULT
+    if window_duration is None:
+        window_duration = AnalysisConfig.WINDOW_DURATION_DEFAULT
+    if n_cycles_factor is None:
+        n_cycles_factor = AnalysisConfig.N_CYCLES_FACTOR_DEFAULT
+    if save_path is None:
+        save_path = DataConfig.get_default_save_path('cross_rats')
+    if show_plots is None:
+        show_plots = AnalysisConfig.CROSS_RATS_SHOW_PLOTS
+    if method is None:
+        method = AnalysisConfig.SPECTROGRAM_METHOD_DEFAULT
+    if verbose is None:
+        verbose = AnalysisConfig.CROSS_RATS_VERBOSE
+    
     if verbose:
         print("🧠 Cross-Rats NM Theta Analysis")
         print("=" * 80)
@@ -1077,32 +1106,32 @@ Examples:
     )
     
     # Data parameters
-    parser.add_argument('--pkl_path', default='data/processed/all_eeg_data.pkl',
-                       help='Path to main EEG data file')
+    parser.add_argument('--pkl_path', default=DataConfig.MAIN_EEG_DATA_FILE,
+                       help=f'Path to main EEG data file (default: {DataConfig.MAIN_EEG_DATA_FILE})')
     parser.add_argument('--roi', required=True,
                        help='ROI name ("frontal", "hippocampus") or channels ("1,2,3")')
     
     # Analysis parameters
-    parser.add_argument('--freq_min', type=float, default=3.0,
-                       help='Minimum frequency (Hz)')
-    parser.add_argument('--freq_max', type=float, default=8.0,
-                       help='Maximum frequency (Hz)')
-    parser.add_argument('--n_freqs', type=int, default=30,
-                       help='Number of frequencies')
-    parser.add_argument('--window_duration', type=float, default=1.0,
-                       help='Event window duration (s)')
-    parser.add_argument('--n_cycles_factor', type=float, default=3.0,
-                       help='Cycles factor for spectrograms')
+    parser.add_argument('--freq_min', type=float, default=AnalysisConfig.THETA_MIN_FREQ,
+                       help=f'Minimum frequency (Hz) (default: {AnalysisConfig.THETA_MIN_FREQ})')
+    parser.add_argument('--freq_max', type=float, default=AnalysisConfig.THETA_MAX_FREQ,
+                       help=f'Maximum frequency (Hz) (default: {AnalysisConfig.THETA_MAX_FREQ})')
+    parser.add_argument('--n_freqs', type=int, default=AnalysisConfig.N_FREQS_DEFAULT,
+                       help=f'Number of frequencies (default: {AnalysisConfig.N_FREQS_DEFAULT})')
+    parser.add_argument('--window_duration', type=float, default=AnalysisConfig.WINDOW_DURATION_DEFAULT,
+                       help=f'Event window duration (s) (default: {AnalysisConfig.WINDOW_DURATION_DEFAULT})')
+    parser.add_argument('--n_cycles_factor', type=float, default=AnalysisConfig.N_CYCLES_FACTOR_DEFAULT,
+                       help=f'Cycles factor for spectrograms (default: {AnalysisConfig.N_CYCLES_FACTOR_DEFAULT})')
     
     # Method parameter
-    parser.add_argument('--method', choices=['mne', 'cwt'], default='mne',
-                       help='Spectrogram calculation method: mne (MNE-Python) or cwt (SciPy CWT)')
+    parser.add_argument('--method', choices=['mne', 'cwt'], default=AnalysisConfig.SPECTROGRAM_METHOD_DEFAULT,
+                       help=f'Spectrogram calculation method (default: {AnalysisConfig.SPECTROGRAM_METHOD_DEFAULT})')
     
     # Processing parameters
     parser.add_argument('--rat_ids', type=str, default=None,
                        help='Specific rat IDs to process (comma-separated), default: all rats')
-    parser.add_argument('--save_path', default='results/cross_rats',
-                       help='Base directory for saving results')
+    parser.add_argument('--save_path', default=DataConfig.CROSS_RATS_RESULTS_DIR,
+                       help=f'Base directory for saving results (default: {DataConfig.CROSS_RATS_RESULTS_DIR})')
     parser.add_argument('--show_plots', action='store_true',
                        help='Show plots during processing')
     parser.add_argument('--quiet', action='store_true',
@@ -1352,19 +1381,29 @@ if __name__ == "__main__":
         # Uncomment the line below to run all channels analysis
         #all_results = run_all_channels_analysis()
         
-        # Or run single channel analysis as before 
+        # Or run single channel analysis using configuration defaults
+        
+        # Debug: Check data file path
+        from config import DataConfig
+        data_path = DataConfig.get_data_file_path(DataConfig.MAIN_EEG_DATA_FILE)
+        print(f"🔍 Debug - Data file path: {data_path}")
+        print(f"🔍 Debug - File exists: {os.path.exists(data_path)}")
+        
         results = run_cross_rats_analysis(
-            roi="8,9,6,11",                    # ROI specification
-            pkl_path="data/processed/all_eeg_data.pkl",  # Data file path
-            freq_min=1.0,                     # Minimum frequency
-            freq_max=10.0,                     # Maximum frequency
-            n_freqs=40,                       # Number of frequencies
-            window_duration=2.0,              # Event window duration
-            n_cycles_factor=3.0,              # Cycles factor (To remove!)
-            rat_ids=None,                     # None for all rats, or ["10501", "1055"] for specific rats
-            save_path="results/cross_rats",   # Save directory
-            show_plots=False,                 # Show plots during processing
-            method="mne",                     # Spectrogram method: "mne" (MNE-Python) or "cwt" (SciPy CWT)
-            verbose=False                      # Print detailed progress information
+            roi="8,9,6,11",                   # Change ROI here
+            pkl_path=data_path,               # Keep explicit path
+            freq_min=6.0,                     # Override config - test narrow theta
+            freq_max=8.0,                     # Override config
+            n_freqs=20,                       # Override config - faster analysis
+            window_duration=2.0,              # Override config - longer window
+            verbose=True                      # Override config
         )
+        
+        """
+        results = run_cross_rats_analysis(
+            roi="8,9,6,11",                   # Only required parameter
+            pkl_path=data_path                # Only because we need explicit path
+            # Everything else uses config defaults
+            )
+        """
 

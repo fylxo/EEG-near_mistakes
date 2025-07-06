@@ -11,6 +11,7 @@ nm_multi_session_rat_*/
 nm_roi_theta_results/
 nm_theta_results/
 single_session_*/
+backups/
 
 # Claude Code files
 .claude

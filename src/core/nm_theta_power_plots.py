@@ -390,8 +390,8 @@ if __name__ == "__main__":
             # Run theta power analysis
             theta_results = create_theta_power_analysis(
                 results_path=results_path,
-                theta_range=(4.0, 10.0),        # Theta frequency range
-                time_window=(-0.25,0.25),              # Use all time points, or specify (start, end) in seconds
+                theta_range=(7.0, 10.0),        # Theta frequency range
+                time_window=(-0.10,0.10),              # Use all time points, or specify (start, end) in seconds
                 save_path=None,                # Save in same directory as results
                 verbose=True
             )

@@ -1354,10 +1354,10 @@ if __name__ == "__main__":
         
         # Or run single channel analysis as before 
         results = run_cross_rats_analysis(
-            roi="1,2,3",                    # ROI specification
+            roi="8,9,6,11",                    # ROI specification
             pkl_path="data/processed/all_eeg_data.pkl",  # Data file path
             freq_min=1.0,                     # Minimum frequency
-            freq_max=45.0,                     # Maximum frequency
+            freq_max=10.0,                     # Maximum frequency
             n_freqs=40,                       # Number of frequencies
             window_duration=2.0,              # Event window duration
             n_cycles_factor=3.0,              # Cycles factor (To remove!)

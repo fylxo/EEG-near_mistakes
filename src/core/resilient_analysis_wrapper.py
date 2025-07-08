@@ -243,7 +243,7 @@ def aggregate_session_results(session_results: Dict[str, Dict],
         'n_sessions_analyzed': len(session_results),
         'n_sessions_successful': len(session_results),
         'roi_channels': first_session_result.get('roi_channels'),
-        'frequencies': first_session_result.get('frequencies'),
+        'frequencies': first_session_result.get('frequencies') or first_session_result.get('freqs'),
         'analysis_parameters': first_session_result.get('analysis_parameters', {}),
         'averaged_windows': {},
         'session_contributions': {}

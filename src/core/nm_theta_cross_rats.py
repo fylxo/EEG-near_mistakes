@@ -32,9 +32,9 @@ from config import AnalysisConfig, DataConfig, PlottingConfig
 # Import the run_analysis function from nm_theta_analyzer
 from nm_theta_analyzer import run_analysis
 
-# Import session resilience system
-from session_resilience import SessionProcessor
-from resilient_analysis_wrapper import run_analysis_with_resilience
+# Import session resilience system (simplified - now built into nm_theta_multi_session)
+# from session_resilience import SessionProcessor
+# from resilient_analysis_wrapper import run_analysis_with_resilience
 
 # Parula colormap data
 PARULA_DATA = [
@@ -449,8 +449,6 @@ def process_single_rat_multi_session(
     show_plots: bool = False,
     method: str = 'mne',
     cleanup_intermediate_files: bool = True,
-    session_resilience: bool = True,
-    max_session_retries: int = 3,
     verbose: bool = True
 ) -> Tuple[str, Optional[Dict]]:
     """
@@ -480,10 +478,6 @@ def process_single_rat_multi_session(
         Spectrogram calculation method: 'mne' (MNE-Python)
     cleanup_intermediate_files : bool
         Whether to delete individual session folders after averaging (default: True)
-    session_resilience : bool
-        Whether to enable session-level retry logic for memory failures (default: True)
-    max_session_retries : int
-        Maximum number of retry attempts per failed session (default: 3)
     verbose : bool
         Whether to print detailed progress information (default: True)
         
@@ -499,8 +493,7 @@ def process_single_rat_multi_session(
         print(f"    Method: {method.upper()} (MNE-Python)")
         if rat_id == '9442':
             print(f"    Special handling: Mixed 32/20 channel sessions")
-        if session_resilience:
-            print(f"    Session resilience: Enabled (max {max_session_retries} retries per session)")
+        print(f"    Session resilience: Built-in (up to 2 retries per session)")
         print("=" * 60)
     
     try:
@@ -525,51 +518,26 @@ def process_single_rat_multi_session(
             mapping_df = None
         
         if method == 'mne':
-            # Use resilient analysis wrapper for MNE-based analysis
-            if session_resilience:
-                results = run_analysis_with_resilience(
-                    mode='multi',
-                    method='basic',  # method ignored for multi-session
-                    parallel_type=None,
-                    pkl_path=pkl_path,
-                    roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
-                    session_index=None,  # ignored for multi-session
-                    rat_id=rat_id,
-                    freq_min=freq_range[0],
-                    freq_max=freq_range[1],
-                    n_freqs=n_freqs,
-                    window_duration=window_duration,
-                    n_cycles_factor=n_cycles_factor,
-                    n_jobs=None,
-                    batch_size=8,
-                    save_path=rat_save_path,
-                    show_plots=show_plots,
-                    show_frequency_profiles=False,
-                    session_resilience=session_resilience,
-                    max_session_retries=max_session_retries,
-                    verbose=verbose
-                )
-            else:
-                # Use original analysis without resilience
-                results = run_analysis(
-                    mode='multi',
-                    method='basic',  # method ignored for multi-session
-                    parallel_type=None,
-                    pkl_path=pkl_path,
-                    roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
-                    session_index=None,  # ignored for multi-session
-                    rat_id=rat_id,
-                    freq_min=freq_range[0],
-                    freq_max=freq_range[1],
-                    n_freqs=n_freqs,
-                    window_duration=window_duration,
-                    n_cycles_factor=n_cycles_factor,
-                    n_jobs=None,
-                    batch_size=8,
-                    save_path=rat_save_path,
-                    show_plots=show_plots,
-                    show_frequency_profiles=False
-                )
+            # Use original analysis with built-in lightweight resilience
+            results = run_analysis(
+                mode='multi',
+                method='basic',  # method ignored for multi-session
+                parallel_type=None,
+                pkl_path=pkl_path,
+                roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
+                session_index=None,  # ignored for multi-session
+                rat_id=rat_id,
+                freq_min=freq_range[0],
+                freq_max=freq_range[1],
+                n_freqs=n_freqs,
+                window_duration=window_duration,
+                n_cycles_factor=n_cycles_factor,
+                n_jobs=None,
+                batch_size=8,
+                save_path=rat_save_path,
+                show_plots=show_plots,
+                show_frequency_profiles=False
+            )
         else:
             raise ValueError(f"Unknown method: {method}. Use 'mne'.")
         
@@ -997,8 +965,6 @@ def run_cross_rats_analysis(
     show_plots: bool = None,
     method: str = None,
     cleanup_intermediate_files: bool = None,
-    session_resilience: bool = None,
-    max_session_retries: int = None,
     verbose: bool = None
 ) -> Dict:
     """
@@ -1030,10 +996,6 @@ def run_cross_rats_analysis(
         Spectrogram calculation method (default: from AnalysisConfig)
     cleanup_intermediate_files : bool, optional
         Whether to delete individual session folders after averaging (default: True)
-    session_resilience : bool, optional
-        Whether to enable session-level retry logic for memory failures (default: True)
-    max_session_retries : int, optional
-        Maximum number of retry attempts per failed session (default: 3)
     verbose : bool, optional
         Whether to print detailed progress information (default: from AnalysisConfig)
         
@@ -1063,10 +1025,6 @@ def run_cross_rats_analysis(
         method = AnalysisConfig.SPECTROGRAM_METHOD_DEFAULT
     if cleanup_intermediate_files is None:
         cleanup_intermediate_files = True  # Default to cleanup enabled
-    if session_resilience is None:
-        session_resilience = True  # Default to resilience enabled
-    if max_session_retries is None:
-        max_session_retries = 3  # Default to 3 retries per session
     if verbose is None:
         verbose = AnalysisConfig.CROSS_RATS_VERBOSE
     
@@ -1135,8 +1093,6 @@ def run_cross_rats_analysis(
             show_plots=show_plots,
             method=method,
             cleanup_intermediate_files=cleanup_intermediate_files,
-            session_resilience=session_resilience,
-            max_session_retries=max_session_retries,
             verbose=verbose
         )
         
@@ -1517,17 +1473,15 @@ if __name__ == "__main__":
 
     
         results = run_cross_rats_analysis(
-            roi="1,2,3",                   # Change ROI here
+            roi="8,9,6,11",                   # Change ROI here
             pkl_path=data_path,               # Keep explicit path
             freq_min=1.0,                     # Override config - test narrow theta
-            freq_max=40.0,                     # Override config
-            n_freqs=12,                       # Override config - faster analysis
-            rat_ids=["9442"],
+            freq_max=10.0,                     # Override config
+            n_freqs=60,                       # Override config - faster analysis
+            #rat_ids=["9442"],
             window_duration=2.0,              # Override config - longer window
             save_path="D:/nm_theta_results",  # Save to D: 
             cleanup_intermediate_files=True,  # Cleanup session folders (saves space)
-            session_resilience=True,          # Enable session-level retry logic
-            max_session_retries=3,            # Try up to 3 times per failed session
             verbose=True                      # Override config
         )
         

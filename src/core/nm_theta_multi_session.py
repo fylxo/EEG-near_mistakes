@@ -300,48 +300,81 @@ def analyze_rat_multi_session_memory_efficient(rat_id: Union[str, int],
     session_results = []
     session_metadata = []
     
+    # Session processing with lightweight resilience
+    failed_sessions = []
+    max_retries = 2
+    
     for session_idx, (orig_session_idx, session_data) in enumerate(zip(session_indices, rat_sessions)):
         print(f"\n--- Session {session_idx + 1}/{len(session_indices)} (Index {orig_session_idx}) ---")
         session_date = session_data.get('session_date', 'unknown')
         print(f"Session {orig_session_idx}: Date {session_date}")
         
-        try:
-            # Run ROI analysis for this session
-            session_save_path = os.path.join(save_path, f'session_{orig_session_idx}')
-            
-            result = analyze_session_nm_theta_roi(
-                session_data=session_data,
-                roi_or_channels=roi_or_channels,
-                freq_range=freq_range,
-                n_freqs=n_freqs,
-                window_duration=window_duration,
-                n_cycles_factor=n_cycles_factor,
-                save_path=session_save_path,
-                mapping_df=mapping_df,
-                show_plots=False  # Don't plot individual sessions
-            )
-            
-            session_results.append(result)
-            
-            # Store metadata
-            metadata = {
-                'original_session_index': orig_session_idx,
-                'session_date': session_date,
-                'rat_id': session_data.get('rat_id'),
-                'roi_channels': result['roi_channels'],
-                'total_nm_events': sum(data['n_events'] for data in result['normalized_windows'].values()),
-                'nm_sizes': list(result['normalized_windows'].keys())
-            }
-            session_metadata.append(metadata)
-            
-            print(f"✓ Session {session_idx + 1} completed successfully")
-            print(f"  ROI channels: {result['roi_channels']}")
-            print(f"  NM events analyzed: {metadata['total_nm_events']}")
-            
-        except Exception as e:
-            print(f"❌ Error processing session {session_idx + 1}: {e}")
-            print("Continuing with remaining sessions...")
-            continue
+        session_success = False
+        
+        # Try processing with retries
+        for attempt in range(max_retries + 1):
+            try:
+                # Clean memory before each attempt (especially important for retries)
+                if attempt > 0:
+                    gc.collect()
+                    print(f"  🔄 Retry {attempt} for session {orig_session_idx}")
+                
+                # Run ROI analysis for this session
+                session_save_path = os.path.join(save_path, f'session_{orig_session_idx}')
+                
+                result = analyze_session_nm_theta_roi(
+                    session_data=session_data,
+                    roi_or_channels=roi_or_channels,
+                    freq_range=freq_range,
+                    n_freqs=n_freqs,
+                    window_duration=window_duration,
+                    n_cycles_factor=n_cycles_factor,
+                    save_path=session_save_path,
+                    mapping_df=mapping_df,
+                    show_plots=False  # Don't plot individual sessions
+                )
+                
+                session_results.append(result)
+                
+                # Store metadata
+                metadata = {
+                    'original_session_index': orig_session_idx,
+                    'session_date': session_date,
+                    'rat_id': session_data.get('rat_id'),
+                    'roi_channels': result['roi_channels'],
+                    'total_nm_events': sum(data['n_events'] for data in result['normalized_windows'].values()),
+                    'nm_sizes': list(result['normalized_windows'].keys())
+                }
+                session_metadata.append(metadata)
+                
+                print(f"✓ Session {session_idx + 1} completed successfully")
+                print(f"  ROI channels: {result['roi_channels']}")
+                print(f"  NM events analyzed: {metadata['total_nm_events']}")
+                
+                session_success = True
+                break
+                
+            except Exception as e:
+                print(f"❌ Session {orig_session_idx} attempt {attempt + 1} failed: {e}")
+                
+                # Force cleanup on failure
+                gc.collect()
+                
+                if attempt == max_retries:
+                    print(f"❌ Session {orig_session_idx} failed after {max_retries + 1} attempts")
+                    failed_sessions.append(orig_session_idx)
+        
+        if not session_success:
+            print(f"❌ Session {orig_session_idx} permanently failed - continuing with remaining sessions")
+    
+    # Report session processing results
+    print(f"\n📊 Session processing summary:")
+    print(f"  Total sessions: {len(session_indices)}")
+    print(f"  Successful: {len(session_results)}")
+    print(f"  Failed: {len(failed_sessions)}")
+    if failed_sessions:
+        print(f"  Failed session indices: {failed_sessions}")
+    print(f"  Success rate: {len(session_results)/len(session_indices)*100:.1f}%")
     
     # Clean up loaded data
     del all_data

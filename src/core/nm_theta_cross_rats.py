@@ -129,6 +129,93 @@ PARULA_DATA = [
 # Create Parula colormap
 PARULA_COLORMAP = ListedColormap(PARULA_DATA)
 
+
+def load_frequencies_from_file(freq_file_path: str) -> np.ndarray:
+    """
+    Load frequencies from a text file.
+    
+    Parameters:
+    -----------
+    freq_file_path : str
+        Path to the frequencies file (one frequency per line)
+    
+    Returns:
+    --------
+    frequencies : np.ndarray
+        Array of frequency values
+    """
+    if not os.path.exists(freq_file_path):
+        raise FileNotFoundError(f"Frequencies file not found: {freq_file_path}")
+    
+    frequencies = []
+    with open(freq_file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line:  # Skip empty lines
+                try:
+                    freq = float(line)
+                    frequencies.append(freq)
+                except ValueError:
+                    print(f"Warning: Skipping invalid frequency value: {line}")
+    
+    if not frequencies:
+        raise ValueError(f"No valid frequencies found in {freq_file_path}")
+    
+    return np.array(frequencies)
+
+
+def get_frequencies(freq_min: float, freq_max: float, n_freqs: int = None, 
+                   freq_file_path: str = None) -> np.ndarray:
+    """
+    Get frequencies either from file or by generating logarithmically spaced values.
+    
+    Parameters:
+    -----------
+    freq_min : float
+        Minimum frequency (Hz) - used for filtering file frequencies
+    freq_max : float
+        Maximum frequency (Hz) - used for filtering file frequencies
+    n_freqs : int, optional
+        Number of frequencies to generate (ignored if freq_file_path is provided)
+    freq_file_path : str, optional
+        Path to frequencies file. If provided, loads from file and filters by freq_min/freq_max
+    
+    Returns:
+    --------
+    frequencies : np.ndarray
+        Array of frequency values
+    """
+    if freq_file_path:
+        # Load from file
+        all_frequencies = load_frequencies_from_file(freq_file_path)
+        
+        # Filter frequencies to be within the specified range
+        mask = (all_frequencies >= freq_min) & (all_frequencies <= freq_max)
+        frequencies = all_frequencies[mask]
+        
+        if len(frequencies) == 0:
+            raise ValueError(f"No frequencies in range {freq_min}-{freq_max} Hz found in {freq_file_path}")
+        
+        # Sort frequencies (typically descending in the file)
+        frequencies = np.sort(frequencies)
+        
+        print(f"Loaded {len(frequencies)} frequencies from {freq_file_path}")
+        print(f"Frequency range: {frequencies[0]:.2f}-{frequencies[-1]:.2f} Hz")
+        
+        return frequencies
+    else:
+        # Generate logarithmically spaced frequencies
+        if n_freqs is None:
+            raise ValueError("Either freq_file_path or n_freqs must be provided")
+        
+        frequencies = np.logspace(np.log10(freq_min), np.log10(freq_max), n_freqs)
+        
+        print(f"Generated {len(frequencies)} logarithmically spaced frequencies")
+        print(f"Frequency range: {frequencies[0]:.2f}-{frequencies[-1]:.2f} Hz")
+        
+        return frequencies
+
+
 # Constants for rat 9442 special handling
 RAT_9442_32_CHANNEL_SESSIONS = ['070419', '080419', '090419', '190419']
 RAT_9442_20_CHANNEL_ELECTRODES = [10, 11, 12, 13, 14, 15, 16, 19, 1, 24, 25, 29, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -958,6 +1045,7 @@ def run_cross_rats_analysis(
     freq_min: float = None,
     freq_max: float = None,
     n_freqs: int = None,
+    freq_file_path: str = None,
     window_duration: float = None,
     n_cycles_factor: float = None,
     rat_ids: Optional[List[str]] = None,
@@ -981,7 +1069,9 @@ def run_cross_rats_analysis(
     freq_max : float, optional
         Maximum frequency (Hz) (default: from AnalysisConfig)
     n_freqs : int, optional
-        Number of frequencies (default: from AnalysisConfig)
+        Number of frequencies (default: from AnalysisConfig, ignored if freq_file_path is provided)
+    freq_file_path : str, optional
+        Path to file containing frequencies (one per line). If provided, loads frequencies from file and filters by freq_min/freq_max
     window_duration : float, optional
         Event window duration (s) (default: from AnalysisConfig)
     n_cycles_factor : float, optional
@@ -1028,12 +1118,47 @@ def run_cross_rats_analysis(
     if verbose is None:
         verbose = AnalysisConfig.CROSS_RATS_VERBOSE
     
+    # Generate or load frequencies
+    if freq_file_path:
+        # Load frequencies from file and adjust parameters accordingly
+        frequencies = get_frequencies(
+            freq_min=freq_min, 
+            freq_max=freq_max, 
+            n_freqs=n_freqs, 
+            freq_file_path=freq_file_path
+        )
+        # Update parameters to match loaded frequencies
+        actual_n_freqs = len(frequencies)
+        actual_freq_min = float(frequencies[0])
+        actual_freq_max = float(frequencies[-1])
+        
+        if verbose:
+            print(f"📁 Using frequencies from file: {freq_file_path}")
+            print(f"   Total frequencies in file: {len(load_frequencies_from_file(freq_file_path))}")
+            print(f"   Frequencies in range {freq_min}-{freq_max} Hz: {actual_n_freqs}")
+            print(f"   Effective range: {actual_freq_min:.2f}-{actual_freq_max:.2f} Hz")
+    else:
+        # Use standard logarithmic spacing
+        actual_n_freqs = n_freqs
+        actual_freq_min = freq_min
+        actual_freq_max = freq_max
+        
+        if verbose:
+            print(f"🔢 Using logarithmic frequency spacing")
+            print(f"   Range: {actual_freq_min}-{actual_freq_max} Hz")
+            print(f"   Number of frequencies: {actual_n_freqs}")
+    
+    # Use the effective parameters for analysis
+    freq_min_analysis = actual_freq_min
+    freq_max_analysis = actual_freq_max
+    n_freqs_analysis = actual_n_freqs
+    
     if verbose:
         print("🧠 Cross-Rats NM Theta Analysis")
         print("=" * 80)
         print(f"Data file: {pkl_path}")
         print(f"ROI: {roi}")
-        print(f"Frequency range: {freq_min}-{freq_max} Hz ({n_freqs} freqs)")
+        print(f"Frequency range: {freq_min_analysis:.2f}-{freq_max_analysis:.2f} Hz ({n_freqs_analysis} freqs)")
         print(f"Window duration: {window_duration}s")
         print(f"Method: {method.upper()} (MNE-Python)")
         print(f"Save path: {save_path}")
@@ -1085,8 +1210,8 @@ def run_cross_rats_analysis(
             rat_id=rat_id,
             roi_or_channels=roi,
             pkl_path=pkl_path,
-            freq_range=(freq_min, freq_max),
-            n_freqs=n_freqs,
+            freq_range=(freq_min_analysis, freq_max_analysis),
+            n_freqs=n_freqs_analysis,
             window_duration=window_duration,
             n_cycles_factor=n_cycles_factor,
             base_save_path=save_path,
@@ -1112,7 +1237,7 @@ def run_cross_rats_analysis(
     aggregated_results = aggregate_cross_rats_results(
         rat_results=rat_results,
         roi_specification=roi,
-        freq_range=(freq_min, freq_max),
+        freq_range=(freq_min_analysis, freq_max_analysis),
         save_path=save_path,
         verbose=verbose
     )
@@ -1477,7 +1602,8 @@ if __name__ == "__main__":
             pkl_path=data_path,               # Keep explicit path
             freq_min=1.0,                     # Override config - test narrow theta
             freq_max=45.0,                     # Override config
-            n_freqs=60,                       # Override config - faster analysis
+            #n_freqs=60,                       # Override config - faster analysis
+            freq_file_path="frequencies_128.txt",  # Use frequencies from file instead of n_freqs
             #rat_ids=["9442"],
             window_duration=2.0,              # Override config - longer window
             save_path="D:/nm_theta_results",  # Save to D: 

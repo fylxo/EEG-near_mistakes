@@ -524,61 +524,52 @@ def process_single_rat_multi_session(
         else:
             mapping_df = None
         
-        # Setup memory monitoring
-        memory_log_file = os.path.join(rat_save_path, f'memory_usage_rat_{rat_id}.log') if verbose else None
-        
-        with monitor_memory_usage(f"rat {rat_id} multi-session analysis", 
-                                 log_file=memory_log_file, 
-                                 verbose=verbose) as monitor:
-            
-            if method == 'mne':
-                # Use resilient analysis wrapper for MNE-based analysis
-                if session_resilience:
-                    results = run_analysis_with_resilience(
-                        mode='multi',
-                        method='basic',  # method ignored for multi-session
-                        parallel_type=None,
-                        pkl_path=pkl_path,
-                        roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
-                        session_index=None,  # ignored for multi-session
-                        rat_id=rat_id,
-                        freq_min=freq_range[0],
-                        freq_max=freq_range[1],
-                        n_freqs=n_freqs,
-                        window_duration=window_duration,
-                        n_cycles_factor=n_cycles_factor,
-                        n_jobs=None,
-                        batch_size=8,
-                        save_path=rat_save_path,
-                        show_plots=show_plots,
-                        show_frequency_profiles=False,
-                        session_resilience=session_resilience,
-                        max_session_retries=max_session_retries,
-                        verbose=verbose
-                    )
-                else:
-                    # Use original analysis without resilience
-                    results = run_analysis(
-                        mode='multi',
-                        method='basic',  # method ignored for multi-session
-                        parallel_type=None,
-                        pkl_path=pkl_path,
-                        roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
-                        session_index=None,  # ignored for multi-session
-                        rat_id=rat_id,
-                        freq_min=freq_range[0],
-                        freq_max=freq_range[1],
-                        n_freqs=n_freqs,
-                        window_duration=window_duration,
-                        n_cycles_factor=n_cycles_factor,
-                        n_jobs=None,
-                        batch_size=8,
-                        save_path=rat_save_path,
-                        show_plots=show_plots,
-                        show_frequency_profiles=False
-                    )
-            
-        
+        if method == 'mne':
+            # Use resilient analysis wrapper for MNE-based analysis
+            if session_resilience:
+                results = run_analysis_with_resilience(
+                    mode='multi',
+                    method='basic',  # method ignored for multi-session
+                    parallel_type=None,
+                    pkl_path=pkl_path,
+                    roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
+                    session_index=None,  # ignored for multi-session
+                    rat_id=rat_id,
+                    freq_min=freq_range[0],
+                    freq_max=freq_range[1],
+                    n_freqs=n_freqs,
+                    window_duration=window_duration,
+                    n_cycles_factor=n_cycles_factor,
+                    n_jobs=None,
+                    batch_size=8,
+                    save_path=rat_save_path,
+                    show_plots=show_plots,
+                    show_frequency_profiles=False,
+                    session_resilience=session_resilience,
+                    max_session_retries=max_session_retries,
+                    verbose=verbose
+                )
+            else:
+                # Use original analysis without resilience
+                results = run_analysis(
+                    mode='multi',
+                    method='basic',  # method ignored for multi-session
+                    parallel_type=None,
+                    pkl_path=pkl_path,
+                    roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
+                    session_index=None,  # ignored for multi-session
+                    rat_id=rat_id,
+                    freq_min=freq_range[0],
+                    freq_max=freq_range[1],
+                    n_freqs=n_freqs,
+                    window_duration=window_duration,
+                    n_cycles_factor=n_cycles_factor,
+                    n_jobs=None,
+                    batch_size=8,
+                    save_path=rat_save_path,
+                    show_plots=show_plots,
+                    show_frequency_profiles=False
+                )
         else:
             raise ValueError(f"Unknown method: {method}. Use 'mne'.")
         
@@ -1293,7 +1284,6 @@ Examples:
         show_plots=args.show_plots,
         method=args.method,
         cleanup_intermediate_files=not args.no_cleanup,  # Cleanup enabled by default
-        resume_from_checkpoint=not args.no_checkpoint,  # Checkpoint enabled by default
         session_resilience=not args.no_resilience,  # Resilience enabled by default
         max_session_retries=args.max_retries,
         verbose=verbose
@@ -1531,8 +1521,8 @@ if __name__ == "__main__":
             pkl_path=data_path,               # Keep explicit path
             freq_min=1.0,                     # Override config - test narrow theta
             freq_max=40.0,                     # Override config
-            n_freqs=240,                       # Override config - faster analysis
-            #rat_ids=["9442"],
+            n_freqs=12,                       # Override config - faster analysis
+            rat_ids=["9442"],
             window_duration=2.0,              # Override config - longer window
             save_path="D:/nm_theta_results",  # Save to D: 
             cleanup_intermediate_files=True,  # Cleanup session folders (saves space)

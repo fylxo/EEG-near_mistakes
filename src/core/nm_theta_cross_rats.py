@@ -1473,10 +1473,10 @@ if __name__ == "__main__":
 
     
         results = run_cross_rats_analysis(
-            roi="8,9,6,11",                   # Change ROI here
+            roi="1,2,3",                   # Change ROI here
             pkl_path=data_path,               # Keep explicit path
             freq_min=1.0,                     # Override config - test narrow theta
-            freq_max=10.0,                     # Override config
+            freq_max=45.0,                     # Override config
             n_freqs=60,                       # Override config - faster analysis
             #rat_ids=["9442"],
             window_duration=2.0,              # Override config - longer window

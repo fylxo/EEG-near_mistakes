@@ -480,7 +480,7 @@ def process_single_rat_multi_session(
     show_plots : bool
         Whether to show plots during processing
     method : str
-        Spectrogram calculation method: 'mne' (MNE-Python) or 'cwt' (SciPy CWT)
+        Spectrogram calculation method: 'mne' (MNE-Python)
     cleanup_intermediate_files : bool
         Whether to delete individual session folders after averaging (default: True)
     session_resilience : bool
@@ -499,7 +499,7 @@ def process_single_rat_multi_session(
     """
     if verbose:
         print(f"\n🐀 Processing rat {rat_id} - Multi-session analysis")
-        print(f"    Method: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
+        print(f"    Method: {method.upper()} (MNE-Python)")
         if rat_id == '9442':
             print(f"    Special handling: Mixed 32/20 channel sessions")
         print("=" * 60)
@@ -588,28 +588,9 @@ def process_single_rat_multi_session(
                         show_frequency_profiles=False
                     )
             
-            elif method == 'cwt':
-                # Use vectorized CWT analysis
-                from nm_theta_single_vectorized import analyze_rat_multi_session_vectorized
-                
-                results = analyze_rat_multi_session_vectorized(
-                    rat_id=rat_id,
-                    roi_or_channels=roi_or_channels,
-                    pkl_path=pkl_path,
-                    freq_range=freq_range,
-                    n_freqs=n_freqs,
-                    window_duration=window_duration,
-                    n_cycles_factor=n_cycles_factor,
-                    save_path=rat_save_path,
-                    mapping_df=None,
-                    show_plots=show_plots,
-                    session_n_jobs=None,
-                    channel_batch_size=8,
-                    method='cwt'
-                )
         
         else:
-            raise ValueError(f"Unknown method: {method}. Use 'mne' or 'cwt'.")
+            raise ValueError(f"Unknown method: {method}. Use 'mne'.")
         
         if verbose:
             print(f"✓ Successfully processed rat {rat_id}")
@@ -1138,13 +1119,13 @@ def run_cross_rats_analysis(
         print(f"ROI: {roi}")
         print(f"Frequency range: {freq_min}-{freq_max} Hz ({n_freqs} freqs)")
         print(f"Window duration: {window_duration}s")
-        print(f"Method: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
+        print(f"Method: {method.upper()} (MNE-Python)")
         print(f"Save path: {save_path}")
         print("=" * 80)
     
     # Validate method parameter
-    if method not in ['mne', 'cwt']:
-        raise ValueError(f"Invalid method: {method}. Use 'mne' or 'cwt'.")
+    if method not in ['mne']:
+        raise ValueError(f"Invalid method: {method}. Use 'mne'.")
     
     # Discover rat IDs
     if rat_ids:
@@ -1303,7 +1284,7 @@ def run_cross_rats_analysis(
         if verbose:
             print(f"Results saved to: {save_path}")
             print(f"\nDetailed Summary:")
-            print(f"  Method used: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
+            print(f"  Method used: {method.upper()} (MNE-Python)")
             print(f"  Rats successfully processed: {aggregated_results['n_rats']}")
             print(f"  Successful rat IDs: {aggregated_results['rat_ids']}")
             print(f"  NM sizes analyzed: {[float(key) for key in aggregated_results['averaged_windows'].keys()]}")
@@ -1326,17 +1307,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Analyze frontal ROI across all rats (MNE method)
+  # Analyze frontal ROI across all rats
   python nm_theta_cross_rats.py --roi frontal --freq_min 3 --freq_max 8
   
-  # Analyze frontal ROI using SciPy CWT method
-  python nm_theta_cross_rats.py --roi frontal --freq_min 3 --freq_max 8 --method cwt
+  # Analyze specific channels across all rats
+  python nm_theta_cross_rats.py --roi "1,2,3" --freq_min 1 --freq_max 12
   
-  # Analyze specific channels across all rats (CWT method)
-  python nm_theta_cross_rats.py --roi "1,2,3" --freq_min 1 --freq_max 12 --method cwt
-  
-  # Analyze hippocampus with custom parameters (MNE method)
-  python nm_theta_cross_rats.py --roi hippocampus --freq_min 6 --freq_max 10 --n_freqs 20 --method mne
+  # Analyze hippocampus with custom parameters
+  python nm_theta_cross_rats.py --roi hippocampus --freq_min 6 --freq_max 10 --n_freqs 20
         """
     )
     
@@ -1359,8 +1337,8 @@ Examples:
                        help=f'Cycles factor for spectrograms (default: {AnalysisConfig.N_CYCLES_FACTOR_DEFAULT})')
     
     # Method parameter
-    parser.add_argument('--method', choices=['mne', 'cwt'], default=AnalysisConfig.SPECTROGRAM_METHOD_DEFAULT,
-                       help=f'Spectrogram calculation method (default: {AnalysisConfig.SPECTROGRAM_METHOD_DEFAULT})')
+    parser.add_argument('--method', choices=['mne'], default='mne',
+                       help='Spectrogram calculation method (default: mne)')
     
     # Processing parameters
     parser.add_argument('--rat_ids', type=str, default=None,

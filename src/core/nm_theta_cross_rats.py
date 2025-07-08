@@ -32,6 +32,13 @@ from config import AnalysisConfig, DataConfig, PlottingConfig
 # Import the run_analysis function from nm_theta_analyzer
 from nm_theta_analyzer import run_analysis
 
+# Import memory monitoring utilities
+from memory_monitor import monitor_memory_usage, force_garbage_collection, check_memory_requirements, log_memory_warning
+
+# Import session resilience system
+from session_resilience import SessionProcessor
+from resilient_analysis_wrapper import run_analysis_with_resilience
+
 # Parula colormap data
 PARULA_DATA = [
     [0.2422, 0.1504, 0.6603], [0.2444, 0.1534, 0.6728], [0.2464, 0.1569, 0.6847],
@@ -344,6 +351,73 @@ def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False, verbo
     return rat_ids_list
 
 
+def cleanup_session_folders(rat_save_path: str, verbose: bool = True):
+    """
+    Clean up intermediate session folders after multi-session averaging.
+    
+    Deletes individual session folders (session_XX) but keeps the main 
+    multi_session_results.pkl file to save disk space.
+    
+    Parameters:
+    -----------
+    rat_save_path : str
+        Path to the rat's results directory
+    verbose : bool
+        Whether to print cleanup progress (default: True)
+    """
+    if not os.path.exists(rat_save_path):
+        if verbose:
+            print(f"⚠️  Cleanup skipped - directory does not exist: {rat_save_path}")
+        return
+    
+    session_folders = []
+    total_size_deleted = 0
+    
+    # Find all session folders (session_XX pattern)
+    for item in os.listdir(rat_save_path):
+        item_path = os.path.join(rat_save_path, item)
+        if os.path.isdir(item_path) and item.startswith('session_'):
+            session_folders.append(item_path)
+    
+    if not session_folders:
+        if verbose:
+            print(f"  🧹 No session folders found to cleanup in {rat_save_path}")
+        return
+    
+    if verbose:
+        print(f"  🧹 Cleaning up {len(session_folders)} session folders...")
+    
+    # Delete session folders
+    for folder_path in session_folders:
+        try:
+            # Calculate folder size before deletion
+            folder_size = 0
+            for dirpath, dirnames, filenames in os.walk(folder_path):
+                for filename in filenames:
+                    file_path = os.path.join(dirpath, filename)
+                    try:
+                        folder_size += os.path.getsize(file_path)
+                    except (OSError, IOError):
+                        pass
+            
+            # Delete the folder
+            import shutil
+            shutil.rmtree(folder_path)
+            total_size_deleted += folder_size
+            
+            if verbose:
+                folder_size_mb = folder_size / (1024 * 1024)
+                print(f"    ✓ Deleted {os.path.basename(folder_path)} ({folder_size_mb:.1f} MB)")
+                
+        except Exception as e:
+            if verbose:
+                print(f"    ❌ Error deleting {folder_path}: {e}")
+    
+    if verbose:
+        total_size_mb = total_size_deleted / (1024 * 1024)
+        print(f"  ✓ Cleanup complete - freed {total_size_mb:.1f} MB of disk space")
+
+
 def get_rat_9442_mapping_for_session(session_id: str, mapping_df: pd.DataFrame) -> str:
     """
     Get the appropriate rat mapping for rat 9442 based on session type.
@@ -377,6 +451,9 @@ def process_single_rat_multi_session(
     base_save_path: str = 'results/cross_rats',
     show_plots: bool = False,
     method: str = 'mne',
+    cleanup_intermediate_files: bool = True,
+    session_resilience: bool = True,
+    max_session_retries: int = 3,
     verbose: bool = True
 ) -> Tuple[str, Optional[Dict]]:
     """
@@ -404,6 +481,12 @@ def process_single_rat_multi_session(
         Whether to show plots during processing
     method : str
         Spectrogram calculation method: 'mne' (MNE-Python) or 'cwt' (SciPy CWT)
+    cleanup_intermediate_files : bool
+        Whether to delete individual session folders after averaging (default: True)
+    session_resilience : bool
+        Whether to enable session-level retry logic for memory failures (default: True)
+    max_session_retries : int
+        Maximum number of retry attempts per failed session (default: 3)
     verbose : bool
         Whether to print detailed progress information (default: True)
         
@@ -420,6 +503,15 @@ def process_single_rat_multi_session(
         if rat_id == '9442':
             print(f"    Special handling: Mixed 32/20 channel sessions")
         print("=" * 60)
+        
+        # Memory requirements estimation
+        n_channels = len(roi_or_channels) if isinstance(roi_or_channels, list) else 3  # Estimate
+        estimates = check_memory_requirements(
+            n_freqs=n_freqs,
+            n_time_points=int(window_duration * 1000 * 60),  # Rough estimate for session length
+            n_channels=n_channels
+        )
+        log_memory_warning(f"rat {rat_id} analysis", estimates, verbose=verbose)
     
     try:
         # Create save path for this rat
@@ -442,47 +534,79 @@ def process_single_rat_multi_session(
         else:
             mapping_df = None
         
-        if method == 'mne':
-            # Use nm_theta_analyzer for MNE-based analysis
-            results = run_analysis(
-                mode='multi',
-                method='basic',  # method ignored for multi-session
-                parallel_type=None,
-                pkl_path=pkl_path,
-                roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
-                session_index=None,  # ignored for multi-session
-                rat_id=rat_id,
-                freq_min=freq_range[0],
-                freq_max=freq_range[1],
-                n_freqs=n_freqs,
-                window_duration=window_duration,
-                n_cycles_factor=n_cycles_factor,
-                n_jobs=None,
-                batch_size=8,
-                save_path=rat_save_path,
-                show_plots=show_plots,
-                show_frequency_profiles=False
-            )
+        # Setup memory monitoring
+        memory_log_file = os.path.join(rat_save_path, f'memory_usage_rat_{rat_id}.log') if verbose else None
         
-        elif method == 'cwt':
-            # Use vectorized CWT analysis
-            from nm_theta_single_vectorized import analyze_rat_multi_session_vectorized
+        with monitor_memory_usage(f"rat {rat_id} multi-session analysis", 
+                                 log_file=memory_log_file, 
+                                 verbose=verbose) as monitor:
             
-            results = analyze_rat_multi_session_vectorized(
-                rat_id=rat_id,
-                roi_or_channels=roi_or_channels,
-                pkl_path=pkl_path,
-                freq_range=freq_range,
-                n_freqs=n_freqs,
-                window_duration=window_duration,
-                n_cycles_factor=n_cycles_factor,
-                save_path=rat_save_path,
-                mapping_df=None,
-                show_plots=show_plots,
-                session_n_jobs=None,
-                channel_batch_size=8,
-                method='cwt'
-            )
+            if method == 'mne':
+                # Use resilient analysis wrapper for MNE-based analysis
+                if session_resilience:
+                    results = run_analysis_with_resilience(
+                        mode='multi',
+                        method='basic',  # method ignored for multi-session
+                        parallel_type=None,
+                        pkl_path=pkl_path,
+                        roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
+                        session_index=None,  # ignored for multi-session
+                        rat_id=rat_id,
+                        freq_min=freq_range[0],
+                        freq_max=freq_range[1],
+                        n_freqs=n_freqs,
+                        window_duration=window_duration,
+                        n_cycles_factor=n_cycles_factor,
+                        n_jobs=None,
+                        batch_size=8,
+                        save_path=rat_save_path,
+                        show_plots=show_plots,
+                        show_frequency_profiles=False,
+                        session_resilience=session_resilience,
+                        max_session_retries=max_session_retries,
+                        verbose=verbose
+                    )
+                else:
+                    # Use original analysis without resilience
+                    results = run_analysis(
+                        mode='multi',
+                        method='basic',  # method ignored for multi-session
+                        parallel_type=None,
+                        pkl_path=pkl_path,
+                        roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
+                        session_index=None,  # ignored for multi-session
+                        rat_id=rat_id,
+                        freq_min=freq_range[0],
+                        freq_max=freq_range[1],
+                        n_freqs=n_freqs,
+                        window_duration=window_duration,
+                        n_cycles_factor=n_cycles_factor,
+                        n_jobs=None,
+                        batch_size=8,
+                        save_path=rat_save_path,
+                        show_plots=show_plots,
+                        show_frequency_profiles=False
+                    )
+            
+            elif method == 'cwt':
+                # Use vectorized CWT analysis
+                from nm_theta_single_vectorized import analyze_rat_multi_session_vectorized
+                
+                results = analyze_rat_multi_session_vectorized(
+                    rat_id=rat_id,
+                    roi_or_channels=roi_or_channels,
+                    pkl_path=pkl_path,
+                    freq_range=freq_range,
+                    n_freqs=n_freqs,
+                    window_duration=window_duration,
+                    n_cycles_factor=n_cycles_factor,
+                    save_path=rat_save_path,
+                    mapping_df=None,
+                    show_plots=show_plots,
+                    session_n_jobs=None,
+                    channel_batch_size=8,
+                    method='cwt'
+                )
         
         else:
             raise ValueError(f"Unknown method: {method}. Use 'mne' or 'cwt'.")
@@ -492,8 +616,15 @@ def process_single_rat_multi_session(
             print(f"  Sessions analyzed: {results.get('n_sessions_analyzed', 'unknown')}")
             print(f"  Results saved to: {rat_save_path}")
         
-        # Force garbage collection
-        gc.collect()
+        # Cleanup intermediate session files if requested
+        if cleanup_intermediate_files:
+            cleanup_session_folders(rat_save_path, verbose=verbose)
+        
+        # Force garbage collection with monitoring
+        if verbose:
+            force_garbage_collection(verbose=True)
+        else:
+            gc.collect()
         
         return rat_id, results
         
@@ -599,7 +730,7 @@ def aggregate_cross_rats_results(
         
         final_aggregated_windows[nm_size] = {
             'avg_spectrogram': avg_spectrogram,
-            'individual_spectrograms': spectrograms,
+            # 'individual_spectrograms': spectrograms,  # Commented out to save memory/storage
             'window_times': first_result['averaged_windows'][nm_size]['window_times'],
             'total_events_per_rat': data['total_events'],
             'n_sessions_per_rat': data['n_sessions'],
@@ -738,9 +869,13 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
     for nm_size in nm_sizes:
         window_data = results['averaged_windows'][nm_size]
         all_spectrograms.append(window_data['avg_spectrogram'])
-        all_spectrograms.extend(window_data['individual_spectrograms'])
+        # Note: individual_spectrograms removed to save memory/storage
     
     vmin, vmax = calculate_color_limits(all_spectrograms)
+    # Hardcoded color limits for now
+    vmin = -0.5
+    vmax = 0.3
+    
     if verbose:
         print(f"📊 Color map limits: [{vmin}, {vmax}] (calculated from data)")
     
@@ -815,72 +950,95 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
     if n_nm_sizes == 1:  # Only create if single NM size to avoid complexity
         nm_size = nm_sizes[0]
         window_data = results['averaged_windows'][nm_size]
-        individual_spectrograms = window_data['individual_spectrograms']
-        rat_ids = window_data['rat_ids']
         
+        # Create individual rat summary plot (since individual spectrograms not stored)
+        rat_ids = window_data['rat_ids']
         n_rats_to_show = min(6, len(rat_ids))  # Show up to 6 rats
         
-        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
-        axes = axes.flatten()
-        
-        for j in range(n_rats_to_show):
-            ax = axes[j]
-            spectrogram = individual_spectrograms[j]
-            rat_id = rat_ids[j]
+        if n_rats_to_show > 0:
+            fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+            axes = axes.flatten()
             
-            # Use log-frequency spacing for y-axis
-            log_frequencies = np.log10(frequencies)
-            im = ax.pcolormesh(window_times, log_frequencies, spectrogram,
-                              shading='auto', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
-            ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
-            ax.set_xlabel('Time (s)')
-            ax.set_ylabel('Frequency (Hz)')
-            ax.set_title(f'Rat {rat_id}\nEvents: {window_data["total_events_per_rat"][j]}, '
-                        f'Sessions: {window_data["n_sessions_per_rat"][j]}')
-            
-            # Set y-axis ticks to show frequencies on log scale
-            # Create tick positions at log-frequency values
-            ax.set_yticks(log_frequencies)
-            
-            # Create labels array with empty strings for most frequencies
-            freq_labels = [''] * len(frequencies)
-            
-            # Always show first and last frequency
-            freq_labels[0] = f'{frequencies[0]:.1f}'
-            freq_labels[-1] = f'{frequencies[-1]:.1f}'
-            
-            # Show 5 intermediate frequencies, excluding ones too close to first/last
-            if len(frequencies) > 6:  # Need at least 7 frequencies for this approach
-                n_intermediate = 5
-                indices = np.linspace(1, len(frequencies)-2, n_intermediate, dtype=int)
+            for j in range(n_rats_to_show):
+                ax = axes[j]
+                rat_id = rat_ids[j]
                 
-                # Exclude indices too close to first (0) and last (-1)
-                min_distance = max(1, len(frequencies) // 10)  # At least 10% away from edges
+                # Show the average spectrogram for each rat (same for all, but with individual stats)
+                avg_spectrogram = window_data['avg_spectrogram']
+                window_times = window_data['window_times']
                 
-                for idx in indices:
-                    if idx >= min_distance and idx <= len(frequencies) - min_distance - 1:
-                        freq_labels[idx] = f'{frequencies[idx]:.1f}'
+                # Use log-frequency spacing for y-axis
+                log_frequencies = np.log10(frequencies)
+                im = ax.pcolormesh(window_times, log_frequencies, avg_spectrogram,
+                                  shading='auto', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
+                ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
+                ax.set_xlabel('Time (s)')
+                ax.set_ylabel('Frequency (Hz)')
+                ax.set_title(f'Rat {rat_id} (Average Pattern)\nEvents: {window_data["total_events_per_rat"][j]}, '
+                            f'Sessions: {window_data["n_sessions_per_rat"][j]}')
+                
+                # Set y-axis ticks to show frequencies on log scale
+                # Create tick positions at log-frequency values
+                ax.set_yticks(log_frequencies)
+                
+                # Create labels array with empty strings for most frequencies
+                freq_labels = [''] * len(frequencies)
+                
+                # Always show first and last frequency
+                freq_labels[0] = f'{frequencies[0]:.1f}'
+                freq_labels[-1] = f'{frequencies[-1]:.1f}'
+                
+                # Show 5 intermediate frequencies, excluding ones too close to first/last
+                if len(frequencies) > 6:  # Need at least 7 frequencies for this approach
+                    n_intermediate = 5
+                    indices = np.linspace(1, len(frequencies)-2, n_intermediate, dtype=int)
+                    
+                    # Exclude indices too close to first (0) and last (-1)
+                    min_distance = max(1, len(frequencies) // 10)  # At least 10% away from edges
+                    
+                    for idx in indices:
+                        if idx >= min_distance and idx <= len(frequencies) - min_distance - 1:
+                            freq_labels[idx] = f'{frequencies[idx]:.1f}'
+                
+                ax.set_yticklabels(freq_labels)
+                
+                plt.colorbar(im, ax=ax, label='Z-score')
             
-            ax.set_yticklabels(freq_labels)
+            # Hide unused subplots
+            for j in range(n_rats_to_show, 6):
+                axes[j].set_visible(False)
             
-            plt.colorbar(im, ax=ax, label='Z-score')
-        
-        # Hide unused subplots
-        for j in range(n_rats_to_show, 6):
-            axes[j].set_visible(False)
-        
-        plt.suptitle(f'Individual Rat Spectrograms - NM Size {nm_size}\n{roi_str}, {freq_str}', fontsize=14)
-        
-        # Apply custom spacing parameters for individual rats plot
-        plt.subplots_adjust(left=0.052, bottom=0.07, right=0.55, top=0.924, wspace=0.206, hspace=0.656)
-        
-        individual_plot_file = os.path.join(save_path, f'individual_rats_nm_{nm_size}.png')
-        plt.savefig(individual_plot_file, dpi=300, bbox_inches='tight')
-        if verbose:
-            print(f"✓ Individual rats plot saved to: {individual_plot_file}")
-        
-        plt.show()
+            plt.suptitle(f'Individual Rat Contributions - NM Size {nm_size}\n{roi_str}, {freq_str}\n(Note: Showing average pattern with individual rat statistics)', fontsize=14)
+            
+            # Apply custom spacing parameters for individual rats plot
+            plt.subplots_adjust(left=0.052, bottom=0.07, right=0.55, top=0.924, wspace=0.206, hspace=0.656)
+            
+            individual_plot_file = os.path.join(save_path, f'individual_rats_nm_{nm_size}.png')
+            plt.savefig(individual_plot_file, dpi=300, bbox_inches='tight')
+            if verbose:
+                print(f"✓ Individual rats summary plot saved to: {individual_plot_file}")
+            
+            plt.show()
+        else:
+            if verbose:
+                print("⚠️  Individual rat plots skipped (no rats to display)")
 
+
+def save_checkpoint(checkpoint_data: Dict, checkpoint_file: str):
+    """Save checkpoint data to file."""
+    os.makedirs(os.path.dirname(checkpoint_file), exist_ok=True)
+    with open(checkpoint_file, 'wb') as f:
+        pickle.dump(checkpoint_data, f)
+
+def load_checkpoint(checkpoint_file: str) -> Optional[Dict]:
+    """Load checkpoint data from file."""
+    if os.path.exists(checkpoint_file):
+        try:
+            with open(checkpoint_file, 'rb') as f:
+                return pickle.load(f)
+        except Exception as e:
+            print(f"Warning: Could not load checkpoint: {e}")
+    return None
 
 def run_cross_rats_analysis(
     roi: str,
@@ -894,6 +1052,10 @@ def run_cross_rats_analysis(
     save_path: str = None,
     show_plots: bool = None,
     method: str = None,
+    cleanup_intermediate_files: bool = None,
+    resume_from_checkpoint: bool = None,
+    session_resilience: bool = None,
+    max_session_retries: int = None,
     verbose: bool = None
 ) -> Dict:
     """
@@ -923,6 +1085,14 @@ def run_cross_rats_analysis(
         Show plots during processing (default: from AnalysisConfig)
     method : str, optional
         Spectrogram calculation method (default: from AnalysisConfig)
+    cleanup_intermediate_files : bool, optional
+        Whether to delete individual session folders after averaging (default: True)
+    resume_from_checkpoint : bool, optional
+        Whether to resume from existing checkpoint if available (default: True)
+    session_resilience : bool, optional
+        Whether to enable session-level retry logic for memory failures (default: True)
+    max_session_retries : int, optional
+        Maximum number of retry attempts per failed session (default: 3)
     verbose : bool, optional
         Whether to print detailed progress information (default: from AnalysisConfig)
         
@@ -950,6 +1120,14 @@ def run_cross_rats_analysis(
         show_plots = AnalysisConfig.CROSS_RATS_SHOW_PLOTS
     if method is None:
         method = AnalysisConfig.SPECTROGRAM_METHOD_DEFAULT
+    if cleanup_intermediate_files is None:
+        cleanup_intermediate_files = True  # Default to cleanup enabled
+    if resume_from_checkpoint is None:
+        resume_from_checkpoint = True  # Default to resume enabled
+    if session_resilience is None:
+        session_resilience = True  # Default to resilience enabled
+    if max_session_retries is None:
+        max_session_retries = 3  # Default to 3 retries per session
     if verbose is None:
         verbose = AnalysisConfig.CROSS_RATS_VERBOSE
     
@@ -999,13 +1177,31 @@ def run_cross_rats_analysis(
     else:
         rat_ids = discover_rat_ids(pkl_path, verbose=verbose, roi_or_channels=roi)
     
+    # Setup checkpoint system
+    checkpoint_file = os.path.join(save_path, 'analysis_checkpoint.pkl')
+    
+    # Try to load existing checkpoint
+    checkpoint_data = None
+    if resume_from_checkpoint:
+        checkpoint_data = load_checkpoint(checkpoint_file)
+    
+    if checkpoint_data and verbose:
+        completed_rats = checkpoint_data.get('completed_rats', [])
+        print(f"📁 Resuming from checkpoint - {len(completed_rats)} rats already completed: {completed_rats}")
+    
     # Process each rat individually
-    rat_results = {}
-    failed_rats = []
-    error_details = {}
-    successful_rats = []
+    rat_results = checkpoint_data.get('rat_results', {}) if checkpoint_data else {}
+    failed_rats = checkpoint_data.get('failed_rats', []) if checkpoint_data else []
+    error_details = checkpoint_data.get('error_details', {}) if checkpoint_data else {}
+    successful_rats = checkpoint_data.get('successful_rats', []) if checkpoint_data else []
+    completed_rats = checkpoint_data.get('completed_rats', []) if checkpoint_data else []
     
     for rat_id in rat_ids:
+        # Skip if already completed
+        if rat_id in completed_rats:
+            if verbose:
+                print(f"⏭️  Skipping rat {rat_id} (already completed)")
+            continue
         rat_id_str, results = process_single_rat_multi_session(
             rat_id=rat_id,
             roi_or_channels=roi,
@@ -1017,6 +1213,9 @@ def run_cross_rats_analysis(
             base_save_path=save_path,
             show_plots=show_plots,
             method=method,
+            cleanup_intermediate_files=cleanup_intermediate_files,
+            session_resilience=session_resilience,
+            max_session_retries=max_session_retries,
             verbose=verbose
         )
         
@@ -1028,6 +1227,29 @@ def run_cross_rats_analysis(
             error_details[rat_id_str] = "Processing failed - see logs above for details"
         else:
             successful_rats.append(rat_id_str)
+        
+        # Add to completed list
+        completed_rats.append(rat_id_str)
+        
+        # Save checkpoint after each rat
+        if resume_from_checkpoint:
+            checkpoint_data = {
+                'rat_results': rat_results,
+                'failed_rats': failed_rats,
+                'error_details': error_details,
+                'successful_rats': successful_rats,
+                'completed_rats': completed_rats,
+                'timestamp': datetime.now().isoformat(),
+                'analysis_params': {
+                    'roi': roi,
+                    'freq_range': (freq_min, freq_max),
+                    'n_freqs': n_freqs,
+                    'method': method
+                }
+            }
+            save_checkpoint(checkpoint_data, checkpoint_file)
+            if verbose:
+                print(f"💾 Checkpoint saved ({len(completed_rats)}/{len(rat_ids)} rats completed)")
         
         # Force garbage collection after each rat
         gc.collect()
@@ -1067,6 +1289,17 @@ def run_cross_rats_analysis(
     
     if len(successful_rats) > 0:
         print("\n✅ Cross-rats analysis completed successfully!")
+        
+        # Clean up checkpoint file on successful completion
+        if resume_from_checkpoint and os.path.exists(checkpoint_file):
+            try:
+                os.remove(checkpoint_file)
+                if verbose:
+                    print("🧹 Checkpoint file cleaned up")
+            except Exception as e:
+                if verbose:
+                    print(f"⚠️  Could not remove checkpoint file: {e}")
+        
         if verbose:
             print(f"Results saved to: {save_path}")
             print(f"\nDetailed Summary:")
@@ -1077,6 +1310,8 @@ def run_cross_rats_analysis(
             print(f"  ROI channels: {aggregated_results['roi_channels']}")
     else:
         print("\n❌ Analysis failed - no rats were successfully processed!")
+        if verbose and os.path.exists(checkpoint_file):
+            print(f"💾 Checkpoint file preserved for debugging: {checkpoint_file}")
     
     return aggregated_results
 
@@ -1134,6 +1369,14 @@ Examples:
                        help=f'Base directory for saving results (default: {DataConfig.CROSS_RATS_RESULTS_DIR})')
     parser.add_argument('--show_plots', action='store_true',
                        help='Show plots during processing')
+    parser.add_argument('--no_cleanup', action='store_true',
+                       help='Keep individual session folders (do not delete after averaging)')
+    parser.add_argument('--no_checkpoint', action='store_true',
+                       help='Disable checkpoint/resume functionality')
+    parser.add_argument('--no_resilience', action='store_true',
+                       help='Disable session-level retry logic for memory failures')
+    parser.add_argument('--max_retries', type=int, default=3,
+                       help='Maximum retry attempts per failed session (default: 3)')
     parser.add_argument('--quiet', action='store_true',
                        help='Suppress detailed progress output (opposite of verbose)')
     
@@ -1160,6 +1403,10 @@ Examples:
         save_path=args.save_path,
         show_plots=args.show_plots,
         method=args.method,
+        cleanup_intermediate_files=not args.no_cleanup,  # Cleanup enabled by default
+        resume_from_checkpoint=not args.no_checkpoint,  # Checkpoint enabled by default
+        session_resilience=not args.no_resilience,  # Resilience enabled by default
+        max_session_retries=args.max_retries,
         verbose=verbose
     )
 
@@ -1388,22 +1635,22 @@ if __name__ == "__main__":
         data_path = DataConfig.get_data_file_path(DataConfig.MAIN_EEG_DATA_FILE)
         print(f"🔍 Debug - Data file path: {data_path}")
         print(f"🔍 Debug - File exists: {os.path.exists(data_path)}")
-        
+
+    
         results = run_cross_rats_analysis(
-            roi="8,9,6,11",                   # Change ROI here
+            roi="1,2,3",                   # Change ROI here
             pkl_path=data_path,               # Keep explicit path
-            freq_min=6.0,                     # Override config - test narrow theta
-            freq_max=8.0,                     # Override config
-            n_freqs=20,                       # Override config - faster analysis
+            freq_min=1.0,                     # Override config - test narrow theta
+            freq_max=40.0,                     # Override config
+            n_freqs=240,                       # Override config - faster analysis
+            #rat_ids=["9442"],
             window_duration=2.0,              # Override config - longer window
+            save_path="D:/nm_theta_results",  # Save to D: 
+            cleanup_intermediate_files=True,  # Cleanup session folders (saves space)
+            resume_from_checkpoint=False,     # Disable checkpoint/resume for testing
+            session_resilience=True,          # Enable session-level retry logic
+            max_session_retries=3,            # Try up to 3 times per failed session
             verbose=True                      # Override config
         )
         
-        """
-        results = run_cross_rats_analysis(
-            roi="8,9,6,11",                   # Only required parameter
-            pkl_path=data_path                # Only because we need explicit path
-            # Everything else uses config defaults
-            )
-        """
 

@@ -12,7 +12,6 @@ import pickle
 import traceback
 from typing import Dict, List, Optional, Tuple, Union, Any
 from session_resilience import SessionProcessor
-from memory_monitor import force_garbage_collection, monitor_memory_usage
 
 def run_analysis_with_resilience(
     mode: str,

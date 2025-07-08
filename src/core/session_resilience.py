@@ -11,7 +11,6 @@ import os
 import time
 import traceback
 from typing import Dict, List, Optional, Tuple, Any
-from memory_monitor import force_garbage_collection, monitor_memory_usage
 
 class SessionProcessor:
     """
@@ -61,10 +60,8 @@ class SessionProcessor:
                 if self.verbose and attempt > 0:
                     print(f"    🔄 Retry {attempt}/{self.max_retries} for session {session_id}")
                 
-                # Monitor memory usage during processing
-                with monitor_memory_usage(f"session {session_id} (attempt {attempt + 1})", 
-                                         verbose=self.verbose) as monitor:
-                    result = process_func(*args, **kwargs)
+                # Process the session
+                result = process_func(*args, **kwargs)
                 
                 # Success!
                 if self.verbose:
@@ -88,7 +85,7 @@ class SessionProcessor:
                     
                     # Aggressive cleanup
                     gc.collect()
-                    force_garbage_collection(verbose=self.verbose)
+                    gc.collect()  # Run twice for thorough cleanup
                     
                     # Brief pause to let system settle
                     time.sleep(2)
@@ -176,12 +173,12 @@ class SessionProcessor:
             
             # Force cleanup after each session (regardless of success/failure)
             if self.cleanup_between_retries:
-                force_garbage_collection(verbose=False)  # Silent cleanup
+                gc.collect()  # Silent cleanup
         
         # Final cleanup
         if self.verbose:
             print(f"\n🧹 Final memory cleanup...")
-        force_garbage_collection(verbose=self.verbose)
+        gc.collect()
         
         # Summary
         processing_summary['success_rate'] = (

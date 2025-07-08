@@ -32,9 +32,6 @@ from config import AnalysisConfig, DataConfig, PlottingConfig
 # Import the run_analysis function from nm_theta_analyzer
 from nm_theta_analyzer import run_analysis
 
-# Import memory monitoring utilities
-from memory_monitor import monitor_memory_usage, force_garbage_collection, check_memory_requirements, log_memory_warning
-
 # Import session resilience system
 from session_resilience import SessionProcessor
 from resilient_analysis_wrapper import run_analysis_with_resilience
@@ -502,16 +499,9 @@ def process_single_rat_multi_session(
         print(f"    Method: {method.upper()} ({'MNE-Python' if method == 'mne' else 'SciPy CWT'})")
         if rat_id == '9442':
             print(f"    Special handling: Mixed 32/20 channel sessions")
+        if session_resilience:
+            print(f"    Session resilience: Enabled (max {max_session_retries} retries per session)")
         print("=" * 60)
-        
-        # Memory requirements estimation
-        n_channels = len(roi_or_channels) if isinstance(roi_or_channels, list) else 3  # Estimate
-        estimates = check_memory_requirements(
-            n_freqs=n_freqs,
-            n_time_points=int(window_duration * 1000 * 60),  # Rough estimate for session length
-            n_channels=n_channels
-        )
-        log_memory_warning(f"rat {rat_id} analysis", estimates, verbose=verbose)
     
     try:
         # Create save path for this rat
@@ -534,79 +524,72 @@ def process_single_rat_multi_session(
         else:
             mapping_df = None
         
-        # Setup memory monitoring
-        memory_log_file = os.path.join(rat_save_path, f'memory_usage_rat_{rat_id}.log') if verbose else None
-        
-        with monitor_memory_usage(f"rat {rat_id} multi-session analysis", 
-                                 log_file=memory_log_file, 
-                                 verbose=verbose) as monitor:
-            
-            if method == 'mne':
-                # Use resilient analysis wrapper for MNE-based analysis
-                if session_resilience:
-                    results = run_analysis_with_resilience(
-                        mode='multi',
-                        method='basic',  # method ignored for multi-session
-                        parallel_type=None,
-                        pkl_path=pkl_path,
-                        roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
-                        session_index=None,  # ignored for multi-session
-                        rat_id=rat_id,
-                        freq_min=freq_range[0],
-                        freq_max=freq_range[1],
-                        n_freqs=n_freqs,
-                        window_duration=window_duration,
-                        n_cycles_factor=n_cycles_factor,
-                        n_jobs=None,
-                        batch_size=8,
-                        save_path=rat_save_path,
-                        show_plots=show_plots,
-                        show_frequency_profiles=False,
-                        session_resilience=session_resilience,
-                        max_session_retries=max_session_retries,
-                        verbose=verbose
-                    )
-                else:
-                    # Use original analysis without resilience
-                    results = run_analysis(
-                        mode='multi',
-                        method='basic',  # method ignored for multi-session
-                        parallel_type=None,
-                        pkl_path=pkl_path,
-                        roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
-                        session_index=None,  # ignored for multi-session
-                        rat_id=rat_id,
-                        freq_min=freq_range[0],
-                        freq_max=freq_range[1],
-                        n_freqs=n_freqs,
-                        window_duration=window_duration,
-                        n_cycles_factor=n_cycles_factor,
-                        n_jobs=None,
-                        batch_size=8,
-                        save_path=rat_save_path,
-                        show_plots=show_plots,
-                        show_frequency_profiles=False
-                    )
-            
-            elif method == 'cwt':
-                # Use vectorized CWT analysis
-                from nm_theta_single_vectorized import analyze_rat_multi_session_vectorized
-                
-                results = analyze_rat_multi_session_vectorized(
-                    rat_id=rat_id,
-                    roi_or_channels=roi_or_channels,
+        if method == 'mne':
+            # Use resilient analysis wrapper for MNE-based analysis
+            if session_resilience:
+                results = run_analysis_with_resilience(
+                    mode='multi',
+                    method='basic',  # method ignored for multi-session
+                    parallel_type=None,
                     pkl_path=pkl_path,
-                    freq_range=freq_range,
+                    roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
+                    session_index=None,  # ignored for multi-session
+                    rat_id=rat_id,
+                    freq_min=freq_range[0],
+                    freq_max=freq_range[1],
                     n_freqs=n_freqs,
                     window_duration=window_duration,
                     n_cycles_factor=n_cycles_factor,
+                    n_jobs=None,
+                    batch_size=8,
                     save_path=rat_save_path,
-                    mapping_df=None,
                     show_plots=show_plots,
-                    session_n_jobs=None,
-                    channel_batch_size=8,
-                    method='cwt'
+                    show_frequency_profiles=False,
+                    session_resilience=session_resilience,
+                    max_session_retries=max_session_retries,
+                    verbose=verbose
                 )
+            else:
+                # Use original analysis without resilience
+                results = run_analysis(
+                    mode='multi',
+                    method='basic',  # method ignored for multi-session
+                    parallel_type=None,
+                    pkl_path=pkl_path,
+                    roi=roi_or_channels if isinstance(roi_or_channels, str) else ','.join(map(str, roi_or_channels)),
+                    session_index=None,  # ignored for multi-session
+                    rat_id=rat_id,
+                    freq_min=freq_range[0],
+                    freq_max=freq_range[1],
+                    n_freqs=n_freqs,
+                    window_duration=window_duration,
+                    n_cycles_factor=n_cycles_factor,
+                    n_jobs=None,
+                    batch_size=8,
+                    save_path=rat_save_path,
+                    show_plots=show_plots,
+                    show_frequency_profiles=False
+                )
+        
+        elif method == 'cwt':
+            # Use vectorized CWT analysis
+            from nm_theta_single_vectorized import analyze_rat_multi_session_vectorized
+            
+            results = analyze_rat_multi_session_vectorized(
+                rat_id=rat_id,
+                roi_or_channels=roi_or_channels,
+                pkl_path=pkl_path,
+                freq_range=freq_range,
+                n_freqs=n_freqs,
+                window_duration=window_duration,
+                n_cycles_factor=n_cycles_factor,
+                save_path=rat_save_path,
+                mapping_df=None,
+                show_plots=show_plots,
+                session_n_jobs=None,
+                channel_batch_size=8,
+                method='cwt'
+            )
         
         else:
             raise ValueError(f"Unknown method: {method}. Use 'mne' or 'cwt'.")
@@ -620,11 +603,8 @@ def process_single_rat_multi_session(
         if cleanup_intermediate_files:
             cleanup_session_folders(rat_save_path, verbose=verbose)
         
-        # Force garbage collection with monitoring
-        if verbose:
-            force_garbage_collection(verbose=True)
-        else:
-            gc.collect()
+        # Force garbage collection
+        gc.collect()
         
         return rat_id, results
         
@@ -1024,21 +1004,6 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
                 print("⚠️  Individual rat plots skipped (no rats to display)")
 
 
-def save_checkpoint(checkpoint_data: Dict, checkpoint_file: str):
-    """Save checkpoint data to file."""
-    os.makedirs(os.path.dirname(checkpoint_file), exist_ok=True)
-    with open(checkpoint_file, 'wb') as f:
-        pickle.dump(checkpoint_data, f)
-
-def load_checkpoint(checkpoint_file: str) -> Optional[Dict]:
-    """Load checkpoint data from file."""
-    if os.path.exists(checkpoint_file):
-        try:
-            with open(checkpoint_file, 'rb') as f:
-                return pickle.load(f)
-        except Exception as e:
-            print(f"Warning: Could not load checkpoint: {e}")
-    return None
 
 def run_cross_rats_analysis(
     roi: str,
@@ -1053,7 +1018,6 @@ def run_cross_rats_analysis(
     show_plots: bool = None,
     method: str = None,
     cleanup_intermediate_files: bool = None,
-    resume_from_checkpoint: bool = None,
     session_resilience: bool = None,
     max_session_retries: int = None,
     verbose: bool = None
@@ -1087,8 +1051,6 @@ def run_cross_rats_analysis(
         Spectrogram calculation method (default: from AnalysisConfig)
     cleanup_intermediate_files : bool, optional
         Whether to delete individual session folders after averaging (default: True)
-    resume_from_checkpoint : bool, optional
-        Whether to resume from existing checkpoint if available (default: True)
     session_resilience : bool, optional
         Whether to enable session-level retry logic for memory failures (default: True)
     max_session_retries : int, optional
@@ -1122,8 +1084,6 @@ def run_cross_rats_analysis(
         method = AnalysisConfig.SPECTROGRAM_METHOD_DEFAULT
     if cleanup_intermediate_files is None:
         cleanup_intermediate_files = True  # Default to cleanup enabled
-    if resume_from_checkpoint is None:
-        resume_from_checkpoint = True  # Default to resume enabled
     if session_resilience is None:
         session_resilience = True  # Default to resilience enabled
     if max_session_retries is None:
@@ -1177,31 +1137,13 @@ def run_cross_rats_analysis(
     else:
         rat_ids = discover_rat_ids(pkl_path, verbose=verbose, roi_or_channels=roi)
     
-    # Setup checkpoint system
-    checkpoint_file = os.path.join(save_path, 'analysis_checkpoint.pkl')
-    
-    # Try to load existing checkpoint
-    checkpoint_data = None
-    if resume_from_checkpoint:
-        checkpoint_data = load_checkpoint(checkpoint_file)
-    
-    if checkpoint_data and verbose:
-        completed_rats = checkpoint_data.get('completed_rats', [])
-        print(f"📁 Resuming from checkpoint - {len(completed_rats)} rats already completed: {completed_rats}")
-    
     # Process each rat individually
-    rat_results = checkpoint_data.get('rat_results', {}) if checkpoint_data else {}
-    failed_rats = checkpoint_data.get('failed_rats', []) if checkpoint_data else []
-    error_details = checkpoint_data.get('error_details', {}) if checkpoint_data else {}
-    successful_rats = checkpoint_data.get('successful_rats', []) if checkpoint_data else []
-    completed_rats = checkpoint_data.get('completed_rats', []) if checkpoint_data else []
+    rat_results = {}
+    failed_rats = []
+    error_details = {}
+    successful_rats = []
     
     for rat_id in rat_ids:
-        # Skip if already completed
-        if rat_id in completed_rats:
-            if verbose:
-                print(f"⏭️  Skipping rat {rat_id} (already completed)")
-            continue
         rat_id_str, results = process_single_rat_multi_session(
             rat_id=rat_id,
             roi_or_channels=roi,
@@ -1227,29 +1169,6 @@ def run_cross_rats_analysis(
             error_details[rat_id_str] = "Processing failed - see logs above for details"
         else:
             successful_rats.append(rat_id_str)
-        
-        # Add to completed list
-        completed_rats.append(rat_id_str)
-        
-        # Save checkpoint after each rat
-        if resume_from_checkpoint:
-            checkpoint_data = {
-                'rat_results': rat_results,
-                'failed_rats': failed_rats,
-                'error_details': error_details,
-                'successful_rats': successful_rats,
-                'completed_rats': completed_rats,
-                'timestamp': datetime.now().isoformat(),
-                'analysis_params': {
-                    'roi': roi,
-                    'freq_range': (freq_min, freq_max),
-                    'n_freqs': n_freqs,
-                    'method': method
-                }
-            }
-            save_checkpoint(checkpoint_data, checkpoint_file)
-            if verbose:
-                print(f"💾 Checkpoint saved ({len(completed_rats)}/{len(rat_ids)} rats completed)")
         
         # Force garbage collection after each rat
         gc.collect()
@@ -1289,17 +1208,6 @@ def run_cross_rats_analysis(
     
     if len(successful_rats) > 0:
         print("\n✅ Cross-rats analysis completed successfully!")
-        
-        # Clean up checkpoint file on successful completion
-        if resume_from_checkpoint and os.path.exists(checkpoint_file):
-            try:
-                os.remove(checkpoint_file)
-                if verbose:
-                    print("🧹 Checkpoint file cleaned up")
-            except Exception as e:
-                if verbose:
-                    print(f"⚠️  Could not remove checkpoint file: {e}")
-        
         if verbose:
             print(f"Results saved to: {save_path}")
             print(f"\nDetailed Summary:")
@@ -1310,8 +1218,6 @@ def run_cross_rats_analysis(
             print(f"  ROI channels: {aggregated_results['roi_channels']}")
     else:
         print("\n❌ Analysis failed - no rats were successfully processed!")
-        if verbose and os.path.exists(checkpoint_file):
-            print(f"💾 Checkpoint file preserved for debugging: {checkpoint_file}")
     
     return aggregated_results
 
@@ -1371,8 +1277,6 @@ Examples:
                        help='Show plots during processing')
     parser.add_argument('--no_cleanup', action='store_true',
                        help='Keep individual session folders (do not delete after averaging)')
-    parser.add_argument('--no_checkpoint', action='store_true',
-                       help='Disable checkpoint/resume functionality')
     parser.add_argument('--no_resilience', action='store_true',
                        help='Disable session-level retry logic for memory failures')
     parser.add_argument('--max_retries', type=int, default=3,
@@ -1647,7 +1551,6 @@ if __name__ == "__main__":
             window_duration=2.0,              # Override config - longer window
             save_path="D:/nm_theta_results",  # Save to D: 
             cleanup_intermediate_files=True,  # Cleanup session folders (saves space)
-            resume_from_checkpoint=False,     # Disable checkpoint/resume for testing
             session_resilience=True,          # Enable session-level retry logic
             max_session_retries=3,            # Try up to 3 times per failed session
             verbose=True                      # Override config

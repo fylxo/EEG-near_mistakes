@@ -245,7 +245,7 @@ See `backup_manifest.json` for detailed information about this backup.
 """
     
     readme_path = os.path.join(backup_path, 'README.md')
-    with open(readme_path, 'w') as f:
+    with open(readme_path, 'w', encoding='utf-8') as f:
         f.write(readme_content)
     
     # Final summary

@@ -61,4 +61,29 @@ Thumbs.db
 temp.*
 temporary_*
 *_temp.*
+temp_*
+
+# Generated frequency files
+frequencies*.txt
+
+# MATLAB files
+*.mat
+
+# Generated plots and visualizations
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.pdf
+
+# Backup and example files
+backup_code.py
+parameter_examples.py
+test_configuration.py
+
+# Old files directory
+src/old_files/
+
+# Jupyter notebook outputs
+*.ipynb
 

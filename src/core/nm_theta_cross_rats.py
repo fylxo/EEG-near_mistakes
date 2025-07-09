@@ -1603,7 +1603,7 @@ if __name__ == "__main__":
             freq_min=1.0,                     # Override config - test narrow theta
             freq_max=45.0,                     # Override config
             #n_freqs=60,                       # Override config - faster analysis
-            freq_file_path="frequencies_128.txt",  # Use frequencies from file instead of n_freqs
+            freq_file_path="data/config/frequencies_128.txt",  # Use frequencies from file instead of n_freqs
             #rat_ids=["9442"],
             window_duration=2.0,              # Override config - longer window
             save_path="D:/nm_theta_results",  # Save to D: 

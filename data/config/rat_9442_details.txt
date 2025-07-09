@@ -1,0 +1,10 @@
+The 32 channel sessions are only:
+070419
+080419
+090419
+190419
+
+The electrodes it has:
+10,11,12,13,14,15,16,19,1
+24,25,29
+2,3,4,5,6,7,8,9

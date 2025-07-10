@@ -1316,6 +1316,8 @@ Examples:
                        help=f'Maximum frequency (Hz) (default: {AnalysisConfig.THETA_MAX_FREQ})')
     parser.add_argument('--n_freqs', type=int, default=AnalysisConfig.N_FREQS_DEFAULT,
                        help=f'Number of frequencies (default: {AnalysisConfig.N_FREQS_DEFAULT})')
+    parser.add_argument('--freq_file_path', type=str, default=None,
+                       help='Path to frequencies file (one frequency per line)')
     parser.add_argument('--window_duration', type=float, default=AnalysisConfig.WINDOW_DURATION_DEFAULT,
                        help=f'Event window duration (s) (default: {AnalysisConfig.WINDOW_DURATION_DEFAULT})')
     parser.add_argument('--n_cycles_factor', type=float, default=AnalysisConfig.N_CYCLES_FACTOR_DEFAULT,
@@ -1340,6 +1342,8 @@ Examples:
                        help='Maximum retry attempts per failed session (default: 3)')
     parser.add_argument('--quiet', action='store_true',
                        help='Suppress detailed progress output (opposite of verbose)')
+    parser.add_argument('--verbose', action='store_true',
+                       help='Enable detailed progress output')
     
     args = parser.parse_args()
     
@@ -1348,8 +1352,8 @@ Examples:
     if args.rat_ids:
         rat_ids = [r.strip() for r in args.rat_ids.split(',')]
     
-    # Parse verbose flag (opposite of quiet)
-    verbose = not args.quiet
+    # Parse verbose flag (opposite of quiet, or explicit verbose)
+    verbose = args.verbose or not args.quiet
     
     # Run the analysis
     return run_cross_rats_analysis(
@@ -1358,6 +1362,7 @@ Examples:
         freq_min=args.freq_min,
         freq_max=args.freq_max,
         n_freqs=args.n_freqs,
+        freq_file_path=args.freq_file_path,
         window_duration=args.window_duration,
         n_cycles_factor=args.n_cycles_factor,
         rat_ids=rat_ids,
@@ -1365,8 +1370,6 @@ Examples:
         show_plots=args.show_plots,
         method=args.method,
         cleanup_intermediate_files=not args.no_cleanup,  # Cleanup enabled by default
-        session_resilience=not args.no_resilience,  # Resilience enabled by default
-        max_session_retries=args.max_retries,
         verbose=verbose
     )
 

@@ -107,7 +107,7 @@ def submit_job(script_path: str, dry_run: bool = False) -> str:
         return ' '.join(cmd)
     else:
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
             job_id = result.stdout.strip().split()[-1]
             return job_id
         except subprocess.CalledProcessError as e:

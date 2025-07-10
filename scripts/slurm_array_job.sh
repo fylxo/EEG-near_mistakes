@@ -37,7 +37,10 @@ N_CYCLES_FACTOR=3.0
 
 # Load modules (adjust for your cluster)
 module purge
-module load python/3.9
+module load python/3.6  # or whatever Python version you have
+
+# Activate virtual environment
+source ${PROJECT_DIR}/eeg_analysis_env/bin/activate
 
 # Set environment variables
 export PYTHONPATH="${PYTHONPATH}:${PROJECT_DIR}/src"

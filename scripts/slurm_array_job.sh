@@ -23,7 +23,7 @@
 
 # Configuration
 DATA_PATH="/path/to/your/data/all_eeg_data.pkl"
-FREQ_FILE_PATH="/path/to/your/data/config/frequencies_128.txt"
+FREQ_FILE_PATH="/path/to/your/data/config/frequencies.txt"
 SAVE_PATH="/path/to/your/results"
 PROJECT_DIR="/path/to/your/eeg-near_mistakes"
 RAT_CONFIG_FILE="rat_config.json"

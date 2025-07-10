@@ -217,7 +217,7 @@ def main():
     
     # Set default freq_file_path if not provided
     if args.freq_file_path is None:
-        args.freq_file_path = os.path.join(args.project_dir, 'data', 'config', 'frequencies_128.txt')
+        args.freq_file_path = os.path.join(args.project_dir, 'data', 'config', 'frequencies.txt')
     
     print("========================================")
     print("SLURM Array Job Submission")

@@ -197,7 +197,7 @@ def main():
     # Optional configuration
     parser.add_argument('--freq_file_path', help='Path to frequencies file (default: data/config/frequencies_128.txt)')
     parser.add_argument('--email', default='your_email@domain.com', help='Email for job notifications')
-    parser.add_argument('--partition', default='cpu', help='SLURM partition')
+    parser.add_argument('--partition', default='bigmem', help='SLURM partition')
     parser.add_argument('--memory_per_job', default='128G', help='Memory per job')
     parser.add_argument('--time_limit', default='24:00:00', help='Time limit per job')
     

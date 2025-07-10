@@ -63,9 +63,6 @@ temporary_*
 *_temp.*
 temp_*
 
-# Generated frequency files
-frequencies*.txt
-
 # MATLAB files
 *.mat
 

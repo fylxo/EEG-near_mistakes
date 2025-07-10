@@ -35,9 +35,9 @@ FREQ_MAX=45.0
 WINDOW_DURATION=2.0
 N_CYCLES_FACTOR=3.0
 
-# Load modules (adjust for your cluster)
-module purge
-module load python/3.6  # or whatever Python version you have
+# Load modules (adjust for your cluster if needed)
+# module purge
+# module load python/3.9
 
 # Activate virtual environment
 source ${PROJECT_DIR}/eeg_analysis_env/bin/activate

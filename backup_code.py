@@ -118,8 +118,7 @@ def create_code_backup(output_dir=None, description=None, verbose=True):
         # Check if source exists
         if not os.path.exists(source_path):
             if is_optional:
-                if verbose:
-                    print(f"    ⚠️  Skipping {source_path} (not found, but optional)")
+                # Silently skip optional files that don't exist
                 backup_manifest['skipped_items'].append({
                     'path': source_path,
                     'reason': 'Not found (optional)',

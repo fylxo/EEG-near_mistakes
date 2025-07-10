@@ -53,6 +53,8 @@ def update_slurm_script(script_path: str, config: Dict, cluster_config: Dict) ->
             updated_lines.append(f'SAVE_PATH="{cluster_config["save_path"]}"')
         elif line.startswith('PROJECT_DIR='):
             updated_lines.append(f'PROJECT_DIR="{cluster_config["project_dir"]}"')
+        elif line.startswith('RAT_CONFIG_FILE='):
+            updated_lines.append(f'RAT_CONFIG_FILE="{cluster_config["rat_config_file"]}"')
         elif line.startswith('#SBATCH --mail-user='):
             updated_lines.append(f'#SBATCH --mail-user={cluster_config["email"]}')
         elif line.startswith('#SBATCH --mem='):
@@ -198,7 +200,7 @@ def main():
     parser.add_argument('--freq_file_path', help='Path to frequencies file (default: data/config/frequencies_128.txt)')
     parser.add_argument('--email', default='your_email@domain.com', help='Email for job notifications')
     parser.add_argument('--partition', default='bigmem', help='SLURM partition')
-    parser.add_argument('--memory_per_job', default='128G', help='Memory per job')
+    parser.add_argument('--memory_per_job', default='200G', help='Memory per job')
     parser.add_argument('--time_limit', default='24:00:00', help='Time limit per job')
     
     # Analysis parameters
@@ -210,6 +212,8 @@ def main():
     
     # Options
     parser.add_argument('--exclude_9442', action='store_true', help='Exclude rat 9442')
+    parser.add_argument('--specific_rats', type=str, default=None, 
+                       help='Comma-separated list of specific rat IDs to process (e.g., "9151,9152,9154")')
     parser.add_argument('--dry_run', action='store_true', help='Show commands without executing')
     parser.add_argument('--force_rediscover', action='store_true', help='Force rediscovery of rats')
     
@@ -256,6 +260,37 @@ def main():
     with open(rat_config_file, 'r') as f:
         rat_config = json.load(f)
     
+    # Filter for specific rats if requested
+    if args.specific_rats:
+        specific_rat_list = [rat.strip() for rat in args.specific_rats.split(',')]
+        print(f"Filtering for specific rats: {specific_rat_list}")
+        
+        # Filter rat_ids
+        original_rats = rat_config['rat_ids']
+        filtered_rats = [rat for rat in specific_rat_list if rat in original_rats]
+        
+        if not filtered_rats:
+            print(f"❌ None of the specified rats {specific_rat_list} found in available rats {original_rats}")
+            sys.exit(1)
+        
+        missing_rats = [rat for rat in specific_rat_list if rat not in original_rats]
+        if missing_rats:
+            print(f"⚠️  Warning: These rats not found in data: {missing_rats}")
+        
+        print(f"Will process {len(filtered_rats)} rats: {filtered_rats}")
+        
+        # Update rat_config
+        rat_config['rat_ids'] = filtered_rats
+        rat_config['n_rats'] = len(filtered_rats)
+        rat_config['array_range'] = f"1-{len(filtered_rats)}"
+        rat_config['rat_id_map'] = {str(i+1): rat_id for i, rat_id in enumerate(filtered_rats)}
+        
+        # Save filtered config
+        filtered_config_file = 'rat_config_filtered.json'
+        with open(filtered_config_file, 'w') as f:
+            json.dump(rat_config, f, indent=2)
+        rat_config_file = filtered_config_file
+    
     print(f"Found {rat_config['n_rats']} rats to process")
     print(f"Array range: {rat_config['array_range']}")
     
@@ -265,6 +300,7 @@ def main():
         'freq_file_path': args.freq_file_path,
         'save_path': args.save_path,
         'project_dir': args.project_dir,
+        'rat_config_file': os.path.basename(rat_config_file),
         'email': args.email,
         'partition': args.partition,
         'memory_per_job': args.memory_per_job,

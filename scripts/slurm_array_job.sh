@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=128G
+#SBATCH --mem=200G
 #SBATCH --time=24:00:00
 #SBATCH --output=logs/nm_theta_rat_%A_%a.out
 #SBATCH --error=logs/nm_theta_rat_%A_%a.err

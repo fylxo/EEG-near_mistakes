@@ -63,7 +63,7 @@ cd ${PROJECT_DIR}
 # Check if rat configuration file exists
 if [ ! -f "$RAT_CONFIG_FILE" ]; then
     echo "ERROR: Rat configuration file not found: $RAT_CONFIG_FILE"
-    echo "Please run: python scripts/discover_rats.py --pkl_path $DATA_PATH"
+    echo "Please run: python3 scripts/discover_rats.py --pkl_path $DATA_PATH"
     exit 1
 fi
 
@@ -132,9 +132,9 @@ echo ""
 
 # Run the analysis
 echo "Starting analysis for rat $RAT_ID at $(date)"
-echo "Command: python src/core/nm_theta_cross_rats.py --rat_ids $RAT_ID --roi \"$ROI\" --freq_min $FREQ_MIN --freq_max $FREQ_MAX --freq_file_path \"$FREQ_FILE_PATH\" --window_duration $WINDOW_DURATION --n_cycles_factor $N_CYCLES_FACTOR --save_path \"$RAT_SAVE_PATH\" --pkl_path \"$DATA_PATH\" --verbose"
+echo "Command: python3 src/core/nm_theta_cross_rats.py --rat_ids $RAT_ID --roi \"$ROI\" --freq_min $FREQ_MIN --freq_max $FREQ_MAX --freq_file_path \"$FREQ_FILE_PATH\" --window_duration $WINDOW_DURATION --n_cycles_factor $N_CYCLES_FACTOR --save_path \"$RAT_SAVE_PATH\" --pkl_path \"$DATA_PATH\" --verbose"
 
-python src/core/nm_theta_cross_rats.py \
+python3 src/core/nm_theta_cross_rats.py \
     --rat_ids "$RAT_ID" \
     --roi "$ROI" \
     --freq_min $FREQ_MIN \

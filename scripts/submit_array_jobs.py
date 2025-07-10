@@ -239,7 +239,7 @@ def main():
     if args.force_rediscover or not os.path.exists(rat_config_file):
         print("Discovering available rats...")
         discover_cmd = [
-            'python', 'scripts/discover_rats.py',
+            'python3', 'scripts/discover_rats.py',
             '--pkl_path', args.data_path,
             '--output', rat_config_file
         ]

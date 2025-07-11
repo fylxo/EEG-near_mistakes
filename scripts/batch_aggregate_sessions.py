@@ -105,7 +105,7 @@ def run_aggregation(rat_dir: str, verbose: bool = True) -> bool:
         cmd.append("--verbose")
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
         if verbose:
             print(result.stdout)
         return True

@@ -86,7 +86,7 @@ def run_session_aggregation(results_dir: str, verbose: bool = True) -> bool:
         cmd.append("--verbose")
     
     try:
-        result = subprocess.run(cmd, check=True)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
         return True
     except subprocess.CalledProcessError:
         return False
@@ -106,7 +106,7 @@ def run_cross_rat_aggregation(results_dir: str, roi: str, freq_min: float, freq_
         cmd.append("--verbose")
     
     try:
-        result = subprocess.run(cmd, check=True)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
         return True
     except subprocess.CalledProcessError:
         return False

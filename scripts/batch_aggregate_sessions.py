@@ -16,7 +16,7 @@ import glob
 import subprocess
 from typing import List
 
-def find_rat_directories(results_dir: str, pattern: str = "rat_*_multi_session_*") -> List[str]:
+def find_rat_directories(results_dir: str, pattern: str = "rat_*/rat_*_multi_session_*") -> List[str]:
     """
     Find all rat directories matching the pattern.
     
@@ -119,7 +119,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='Batch aggregate session results across multiple rats')
     parser.add_argument('--results_dir', required=True, help='Base directory containing rat directories')
-    parser.add_argument('--pattern', default='rat_*_multi_session_*', help='Glob pattern for rat directories')
+    parser.add_argument('--pattern', default='rat_*/rat_*_multi_session_*', help='Glob pattern for rat directories')
     parser.add_argument('--verbose', action='store_true', help='Verbose output')
     parser.add_argument('--dry_run', action='store_true', help='Show what would be processed without actually running')
     

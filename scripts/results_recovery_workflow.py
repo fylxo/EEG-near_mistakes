@@ -53,7 +53,7 @@ def analyze_results_directory(results_dir: str) -> Tuple[List[str], List[str], L
         (completed_rats, partial_rats, failed_rats)
     """
     # Find all rat directories
-    rat_dirs = glob.glob(os.path.join(results_dir, "rat_*_multi_session_*"))
+    rat_dirs = glob.glob(os.path.join(results_dir, "rat_*/rat_*_multi_session_*"))
     
     completed_rats = []
     partial_rats = []

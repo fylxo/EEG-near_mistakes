@@ -25,10 +25,14 @@ echo "==============================================="
 # module load python/3.8
 # module load scipy-stack
 
+# Activate virtual environment (same as array jobs)
+source ${PROJECT_DIR}/eeg_analysis_env/bin/activate
+
 # Ensure logs directory exists
 mkdir -p logs
 
 # Set up environment
+export PYTHONPATH="${PYTHONPATH}:${PROJECT_DIR}/src"
 export PYTHONUNBUFFERED=1
 
 # Validate results directory
@@ -43,20 +47,22 @@ if [ ! -d "$RESULTS_DIR" ]; then
     exit 1
 fi
 
-echo "Changing to project directory..."
-cd /path/to/your/eeg-near_mistakes  # UPDATE THIS PATH
+# Get project directory from script location
+PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+echo "Changing to project directory: $PROJECT_DIR"
+cd "$PROJECT_DIR"
 
 echo "Available memory:"
 free -h
 
 echo "Python version:"
-python --version
+python3 --version
 
 echo "Starting session aggregation..."
 echo "==============================================="
 
 # Run the batch aggregation
-python scripts/simple_batch_aggregate.py \
+python3 scripts/simple_batch_aggregate.py \
     --results_dir "$RESULTS_DIR" \
     --verbose
 
@@ -69,7 +75,7 @@ if [ $AGGREGATION_EXIT_CODE -eq 0 ]; then
     echo "✅ Session aggregation successful!"
     
     echo "Running cross-rat analysis..."
-    python scripts/aggregate_results.py \
+    python3 scripts/aggregate_results.py \
         --results_path "$RESULTS_DIR" \
         --roi "1,2,3" \
         --freq_min 3.0 \

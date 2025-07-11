@@ -43,7 +43,7 @@ def load_session_results(session_result_files: Dict[str, str]) -> List[Dict]:
             with open(result_file, 'rb') as f:
                 results = pickle.load(f)
             
-            if 'normalized_windows' not in results:
+            if 'nm_windows' not in results:
                 continue
             
             session_results.append(results)
@@ -69,7 +69,7 @@ def aggregate_session_results(session_results: List[Dict]) -> Dict:
     # Collect all available NM sizes
     all_nm_sizes = set()
     for result in session_results:
-        all_nm_sizes.update(result['normalized_windows'].keys())
+        all_nm_sizes.update(result['nm_windows'].keys())
     
     # Initialize aggregation
     aggregated_windows = {}
@@ -81,8 +81,8 @@ def aggregate_session_results(session_results: List[Dict]) -> Dict:
         window_times = None
         
         for result in session_results:
-            if nm_size in result['normalized_windows']:
-                session_data = result['normalized_windows'][nm_size]
+            if nm_size in result['nm_windows']:
+                session_data = result['nm_windows'][nm_size]
                 spectrograms.append(session_data['avg_spectrogram'])
                 all_events += session_data['n_events']
                 sessions_with_size += 1
@@ -100,19 +100,20 @@ def aggregate_session_results(session_results: List[Dict]) -> Dict:
                 'n_sessions': sessions_with_size
             }
     
-    # Create final results
+    # Create final results (match multi-session format)
     aggregated_results = {
         'rat_id': rat_id,
         'roi_specification': roi_specification,
         'roi_channels': roi_channels,
         'frequencies': frequencies,
-        'averaged_windows': aggregated_windows,
+        'averaged_windows': aggregated_windows,  # ← This key matches what cross-rats expects
         'n_sessions_analyzed': len(session_results),
+        'analysis_parameters': first_result.get('analysis_parameters', {}),  # Copy from first session
         'session_metadata': [
             {
                 'session_date': result['session_metadata']['session_date'],
-                'nm_sizes': list(result['normalized_windows'].keys()),
-                'total_events': sum(data['n_events'] for data in result['normalized_windows'].values())
+                'nm_sizes': list(result['nm_windows'].keys()),
+                'total_events': sum(data['n_events'] for data in result['nm_windows'].values())
             }
             for result in session_results
         ]

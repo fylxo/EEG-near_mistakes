@@ -94,16 +94,16 @@ def load_session_results(session_result_files: Dict[str, str], verbose: bool = T
                 results = pickle.load(f)
             
             # Validate that this is a session result
-            if 'normalized_windows' not in results:
+            if 'nm_windows' not in results:
                 if verbose:
-                    print(f"  ⚠️  Session {session_id}: No 'normalized_windows' found, skipping")
+                    print(f"  ⚠️  Session {session_id}: No 'nm_windows' found, skipping")
                 continue
             
             session_results.append(results)
             
             if verbose:
-                n_nm_sizes = len(results['normalized_windows'])
-                total_events = sum(data['n_events'] for data in results['normalized_windows'].values())
+                n_nm_sizes = len(results['nm_windows'])
+                total_events = sum(data['n_events'] for data in results['nm_windows'].values())
                 print(f"  ✓ Session {session_id}: {n_nm_sizes} NM sizes, {total_events} events")
                 
         except Exception as e:
@@ -142,7 +142,7 @@ def check_session_compatibility(session_results: List[Dict], verbose: bool = Tru
     
     reference_frequencies = first_results['frequencies']
     reference_roi_channels = first_results['roi_channels']
-    reference_nm_sizes = set(first_results['normalized_windows'].keys())
+    reference_nm_sizes = set(first_results['nm_windows'].keys())
     
     if verbose:
         print(f"  Reference session: {first_results['session_metadata']['session_date']}")
@@ -170,7 +170,7 @@ def check_session_compatibility(session_results: List[Dict], verbose: bool = Tru
             continue
         
         # Check NM sizes (allow subset, as some sessions may not have all NM sizes)
-        session_nm_sizes = set(results['normalized_windows'].keys())
+        session_nm_sizes = set(results['nm_windows'].keys())
         if not session_nm_sizes.issubset(reference_nm_sizes) and not reference_nm_sizes.issubset(session_nm_sizes):
             if verbose:
                 print(f"  ⚠️  Session {session_date}: Different NM sizes ({sorted([float(x) for x in session_nm_sizes])} vs {sorted([float(x) for x in reference_nm_sizes])})")
@@ -211,7 +211,7 @@ def aggregate_session_results(session_results: List[Dict], verbose: bool = True)
     # Collect all available NM sizes across sessions
     all_nm_sizes = set()
     for result in session_results:
-        all_nm_sizes.update(result['normalized_windows'].keys())
+        all_nm_sizes.update(result['nm_windows'].keys())
     
     if verbose:
         print(f"  Rat ID: {rat_id}")
@@ -229,8 +229,8 @@ def aggregate_session_results(session_results: List[Dict], verbose: bool = True)
         window_times = None
         
         for result in session_results:
-            if nm_size in result['normalized_windows']:
-                session_data = result['normalized_windows'][nm_size]
+            if nm_size in result['nm_windows']:
+                session_data = result['nm_windows'][nm_size]
                 spectrograms.append(session_data['avg_spectrogram'])
                 all_events += session_data['n_events']
                 sessions_with_size += 1
@@ -261,11 +261,12 @@ def aggregate_session_results(session_results: List[Dict], verbose: bool = True)
         'frequencies': frequencies,
         'averaged_windows': aggregated_windows,
         'n_sessions_analyzed': len(session_results),
+        'analysis_parameters': first_result.get('analysis_parameters', {}),  # Copy from first session
         'session_metadata': [
             {
                 'session_date': result['session_metadata']['session_date'],
-                'nm_sizes': list(result['normalized_windows'].keys()),
-                'total_events': sum(data['n_events'] for data in result['normalized_windows'].values())
+                'nm_sizes': list(result['nm_windows'].keys()),
+                'total_events': sum(data['n_events'] for data in result['nm_windows'].values())
             }
             for result in session_results
         ]

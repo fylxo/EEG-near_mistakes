@@ -4,9 +4,22 @@ This directory contains scripts to run the NM Theta cross-rats analysis on SLURM
 
 ## Files Overview
 
+### Core SLURM Array Job Scripts:
 - `discover_rats.py` - Discovers available rat IDs from the data file
 - `slurm_array_job.sh` - SLURM array job template (one rat per job)
 - `submit_array_jobs.py` - Main submission script that orchestrates everything
+
+### Results Recovery Scripts (NEW):
+- `aggregate_sessions_to_multi.py` - Aggregates individual session results into multi_session_results.pkl
+- `batch_aggregate_sessions.py` - Batch processes multiple rats for session aggregation
+- `results_recovery_workflow.py` - Complete workflow for recovering from partial SLURM failures
+
+### Cross-Rat Analysis:
+- `aggregate_results.py` - Aggregates multi-session results across rats and creates final plots
+
+### Utilities:
+- `cleanup_results.py` - Cleans up intermediate files to save disk space
+- `create_eeg_data_file.py` - Creates the main EEG data file
 - `README.md` - This file
 
 ## Quick Start
@@ -194,3 +207,95 @@ python scripts/submit_array_jobs.py \
 # For quick testing
 --memory_per_job 64G --time_limit 12:00:00
 ```
+
+## Results Recovery from Partial SLURM Failures
+
+Sometimes SLURM jobs fail partially, leaving some sessions processed but missing the final `multi_session_results.pkl` file. The new recovery scripts help you salvage these partial results.
+
+### Scenario: Partial Job Success
+
+If your SLURM job processes individual sessions but fails before creating `multi_session_results.pkl`, you'll have:
+```
+results/rat_531_multi_session_mne/
+├── session_161/
+│   └── nm_roi_theta_analysis_results.pkl  ✓ SUCCESS
+├── session_162/
+│   └── nm_roi_theta_analysis_results.pkl  ✓ SUCCESS
+├── session_163/
+│   └── nm_roi_theta_analysis_results.pkl  ✓ SUCCESS
+└── multi_session_results.pkl              ✗ MISSING
+```
+
+### Recovery Options:
+
+#### 1. Quick Recovery (Single Rat):
+```bash
+python scripts/aggregate_sessions_to_multi.py \
+  --rat_dir results/rat_531_multi_session_mne \
+  --verbose
+```
+
+#### 2. Batch Recovery (Multiple Rats):
+```bash
+python scripts/batch_aggregate_sessions.py \
+  --results_dir results/ \
+  --verbose
+```
+
+#### 3. Complete Workflow Recovery:
+```bash
+python scripts/results_recovery_workflow.py \
+  --results_dir results/ \
+  --roi "1,2,3" \
+  --freq_min 3.0 \
+  --freq_max 8.0 \
+  --verbose
+```
+
+### Recovery Workflow Steps:
+
+The complete recovery workflow:
+1. **Analyzes** current results state (completed/partial/failed rats)
+2. **Aggregates** individual sessions into `multi_session_results.pkl` 
+3. **Runs** cross-rat analysis to create final visualizations
+
+### Example Recovery Session:
+
+```bash
+# Check what can be recovered
+python scripts/results_recovery_workflow.py \
+  --results_dir /path/to/results \
+  --verbose
+
+# Expected output:
+#   ✅ Completed rats: 3 (have multi_session_results.pkl)
+#   🔄 Partial rats: 5 (have session results, missing multi_session)
+#   ❌ Failed rats: 2 (no usable results)
+```
+
+### When to Use Recovery Scripts:
+
+- **After SLURM timeouts**: Jobs ran out of time but processed some sessions
+- **After memory errors**: Jobs crashed but individual sessions succeeded  
+- **After node failures**: Hardware issues interrupted multi-session aggregation
+- **For selective processing**: You want results from successful sessions only
+
+### Recovery Script Details:
+
+#### `aggregate_sessions_to_multi.py`
+- Processes a single rat directory
+- Aggregates individual `nm_roi_theta_analysis_results.pkl` files
+- Creates `multi_session_results.pkl` for cross-rat analysis
+- Validates session compatibility before aggregation
+
+#### `batch_aggregate_sessions.py`  
+- Processes multiple rat directories at once
+- Automatically detects which rats need session aggregation
+- Skips rats that already have up-to-date `multi_session_results.pkl`
+- Provides batch processing with error handling
+
+#### `results_recovery_workflow.py`
+- Complete end-to-end recovery workflow
+- Analyzes current state and shows recovery potential
+- Runs session aggregation and cross-rat analysis
+- Provides recommendations for next steps

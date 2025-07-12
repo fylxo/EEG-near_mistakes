@@ -22,7 +22,7 @@ echo "Results directory: $RESULTS_DIR"
 echo "==============================================="
 
 # Load required modules (adjust for your cluster)
-# module load python/3.8
+module load Python/3.11.5-GCCcore-13.2.0
 # module load scipy-stack
 
 # Activate virtual environment (same as array jobs)

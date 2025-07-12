@@ -180,6 +180,10 @@ def check_compatibility(rat_results: Dict[str, Dict], verbose: bool = True) -> b
 def main():
     import argparse
     
+    print("🚀 Starting aggregate_results.py script...")
+    print(f"📍 Script location: {__file__}")
+    print(f"📁 Current working directory: {os.getcwd()}")
+    
     parser = argparse.ArgumentParser(description='Aggregate individual rat results into cross-rat averages')
     parser.add_argument('--results_path', required=True, help='Base path containing rat_* result directories')
     parser.add_argument('--output_path', help='Output directory for aggregated results (default: results_path/cross_rats_aggregated)')
@@ -188,7 +192,9 @@ def main():
     parser.add_argument('--freq_max', type=float, default=45.0, help='Maximum frequency (for metadata)')
     parser.add_argument('--verbose', action='store_true', help='Verbose output')
     
+    print("🔧 Parsing command line arguments...")
     args = parser.parse_args()
+    print(f"✅ Arguments parsed successfully")
     
     # Set default output path
     if args.output_path is None:
@@ -203,6 +209,12 @@ def main():
     print("=" * 60)
     
     # Step 1: Find rat result files
+    print(f"\n🔍 Step 1: Looking for rat result files...")
+    print(f"📂 Checking directory: {os.path.abspath(args.results_path)}")
+    print(f"📊 Directory exists: {os.path.exists(args.results_path)}")
+    if os.path.exists(args.results_path):
+        print(f"📋 Directory contents: {os.listdir(args.results_path)[:10]}...")  # Show first 10 items
+    
     rat_result_files = find_rat_results(args.results_path, verbose=args.verbose)
     
     if not rat_result_files:

@@ -22,11 +22,19 @@ echo "Results directory: $RESULTS_DIR"
 echo "==============================================="
 
 # Load required modules (adjust for your cluster)
-module load Python/3.11.5-GCCcore-13.2.0
+# module load Python/3.11.5-GCCcore-13.2.0
 # module load scipy-stack
 
-# Activate virtual environment (same as array jobs)
-source ${PROJECT_DIR}/eeg_analysis_env/bin/activate
+# Get project directory from script location first
+PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+
+# Activate virtual environment if it exists
+if [ -f "${PROJECT_DIR}/eeg_analysis_env/bin/activate" ]; then
+    source ${PROJECT_DIR}/eeg_analysis_env/bin/activate
+    echo "Virtual environment activated"
+else
+    echo "No virtual environment found, using system Python"
+fi
 
 # Ensure logs directory exists
 mkdir -p logs

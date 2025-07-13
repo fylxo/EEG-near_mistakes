@@ -158,7 +158,9 @@ def check_compatibility(rat_results: Dict[str, Dict], verbose: bool = True) -> b
             continue
         
         # Check ROI channels
-        if not (results['roi_channels'] == reference_roi_channels).all():
+        import numpy as np
+        roi_match = np.array_equal(np.array(results['roi_channels']), np.array(reference_roi_channels))
+        if not roi_match:
             if verbose:
                 print(f"  ❌ Rat {rat_id}: Different ROI channels")
             compatible = False

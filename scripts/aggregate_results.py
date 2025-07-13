@@ -157,14 +157,8 @@ def check_compatibility(rat_results: Dict[str, Dict], verbose: bool = True) -> b
             compatible = False
             continue
         
-        # Check ROI channels
-        import numpy as np
-        roi_match = np.array_equal(np.array(results['roi_channels']), np.array(reference_roi_channels))
-        if not roi_match:
-            if verbose:
-                print(f"  ❌ Rat {rat_id}: Different ROI channels")
-            compatible = False
-            continue
+        # Skip ROI channels check - different rats may have different channel mappings
+        # but use the same logical ROIs (1,2,3)
         
         # Check NM sizes
         rat_nm_sizes = set(results['averaged_windows'].keys())

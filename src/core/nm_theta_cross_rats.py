@@ -887,8 +887,8 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
     
     vmin, vmax = calculate_color_limits(all_spectrograms)
     # Hardcoded color limits for now
-    vmin = -0.5
-    vmax = 0.3
+    vmin = -0.42
+    vmax = 0.22
     
     if verbose:
         print(f"📊 Color map limits: [{vmin}, {vmax}] (calculated from data)")

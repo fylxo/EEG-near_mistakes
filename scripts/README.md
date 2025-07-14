@@ -1,301 +1,177 @@
-# SLURM Array Jobs for Cross-Rats Analysis
+# EEG Near-Mistakes Analysis Scripts
 
-This directory contains scripts to run the NM Theta cross-rats analysis on SLURM clusters using array jobs. Each array job processes one rat, providing fault tolerance and parallel processing.
+This directory contains a comprehensive suite of scripts for EEG theta analysis in near-mistakes paradigms using SLURM cluster computing.
 
-## Files Overview
+## 📋 Overview
 
-### Core SLURM Array Job Scripts:
-- `discover_rats.py` - Discovers available rat IDs from the data file
-- `slurm_array_job.sh` - SLURM array job template (one rat per job)
-- `submit_array_jobs.py` - Main submission script that orchestrates everything
+The workflow processes EEG data from multiple rats to identify theta activity patterns during near-mistake events. The analysis uses wavelets, cross-rat aggregation, and statistical visualization to understand neural dynamics across subjects.
 
-### Results Recovery Scripts (NEW):
-- `aggregate_sessions_to_multi.py` - Aggregates individual session results into multi_session_results.pkl
-- `batch_aggregate_sessions.py` - Batch processes multiple rats for session aggregation
-- `results_recovery_workflow.py` - Complete workflow for recovering from partial SLURM failures
+---
 
-### Cross-Rat Analysis:
-- `aggregate_results.py` - Aggregates multi-session results across rats and creates final plots
+## 🔧 Core Processing Scripts
 
-### Utilities:
-- `cleanup_results.py` - Cleans up intermediate files to save disk space
-- `create_eeg_data_file.py` - Creates the main EEG data file
-- `README.md` - This file
+### **Data Preparation**
+- **`create_eeg_data_file.py`** - Converts raw MAT files to processed EEG data format
+- **`discover_rats.py`** - Automatically discovers available rat subjects for batch processing
 
-## Quick Start
+### **SLURM Cluster Processing** 
+- **`submit_array_jobs.py`** - Main orchestration script for SLURM array job submission
+- **`slurm_array_job.sh`** - SLURM template for individual rat processing (high-memory, parallel)
 
-1. **Basic submission** (recommended):
-   ```bash
-   python scripts/submit_array_jobs.py \
-     --data_path /path/to/your/data/all_eeg_data.pkl \
-     --project_dir /path/to/your/eeg-near_mistakes \
-     --save_path /path/to/your/results
-   ```
+### **Session Aggregation**
+- **`aggregate_sessions_to_multi.py`** - Aggregates individual session results into multi-session summaries
+- **`aggregate_sessions_batch.py`** - Batch processes multiple rats for session aggregation
+- **`slurm_aggregate_sessions.sh`** - SLURM script for memory-intensive session aggregation
+- **`submit_aggregate_job.py`** - Submits SLURM jobs for session aggregation
 
-2. **With custom parameters**:
-   ```bash
-   python scripts/submit_array_jobs.py \
-     --data_path /path/to/your/data/all_eeg_data.pkl \
-     --project_dir /path/to/your/eeg-near_mistakes \
-     --save_path /path/to/your/results \
-     --roi "1,2,3" \
-     --freq_min 1.0 \
-     --freq_max 45.0 \
-     --memory_per_job 256G \
-     --time_limit 48:00:00 \
-     --email your_email@domain.com
-   ```
+### **Final Analysis**
+- **`aggregate_results.py`** - Cross-rat aggregation with spectrograms and statistical analysis
 
-3. **Test before submitting**:
-   ```bash
-   python scripts/submit_array_jobs.py \
-     --data_path /path/to/your/data/all_eeg_data.pkl \
-     --project_dir /path/to/your/eeg-near_mistakes \
-     --save_path /path/to/your/results \
-     --dry_run
-   ```
+---
 
-## Step-by-Step Process
+## 🔄 Recovery & Maintenance Scripts
 
-### 1. Rat Discovery
-The script automatically discovers available rats:
+### **Results Recovery**
+- **`results_recovery_workflow.py`** - Complete workflow for recovering from partial SLURM failures
+
+### **Utilities**
+- **`cleanup_results.py`** - Manages disk space by cleaning analysis result folders
+- **`reorganize_hpc_results.py`** - Reorganizes HPC result directory structures
+
+### **Debugging**
+- **`debug_memory_usage.py`** - Diagnoses memory usage and system limits
+- **`debug_session_structure.py`** - Examines structure of session result files
+
+---
+
+## 🚀 Quick Start
+
+### **Standard Workflow:**
 ```bash
-python scripts/discover_rats.py \
-  --pkl_path /path/to/your/data/all_eeg_data.pkl \
-  --exclude_9442  # Optional: exclude rat 9442 due to compatibility issues
+# 1. Submit array jobs for all rats
+python scripts/submit_array_jobs.py \
+  --data_path /path/to/all_eeg_data.pkl \
+  --project_dir /path/to/eeg-near_mistakes \
+  --save_path /path/to/results
+
+# 2. After jobs complete, aggregate results
+python scripts/aggregate_results.py \
+  --results_path /path/to/results \
+  --roi 1,2,3 \
+  --freq_min 3.0 \
+  --freq_max 8.0
 ```
 
-This creates `rat_config.json` with the rat ID mapping for array jobs.
-
-### 2. Array Job Configuration
-The submission script automatically configures the SLURM script with:
-- Array range based on number of rats
-- Cluster-specific paths
-- Analysis parameters
-- Resource requirements
-
-### 3. Job Submission
-Each array job processes one rat:
-- Array task ID 1 → first rat
-- Array task ID 2 → second rat
-- etc.
-
-### 4. Monitoring
-After submission, use the generated monitoring script:
+### **Recovery from Partial Failures:**
 ```bash
-./monitor_jobs.sh
+# Recover partial SLURM results
+python scripts/results_recovery_workflow.py \
+  --results_dir /path/to/results \
+  --verbose
 ```
 
-Or use standard SLURM commands:
-```bash
-squeue -u $USER --name=nm_theta_array
-sacct -j <JOB_ID> --format=JobID,JobName,State,ExitCode,MaxRSS
-```
+---
 
-## Resource Requirements
+## 📊 Analysis Parameters
 
-### Per-Rat Job Requirements:
-- **Memory**: 128G (adjust based on your data size)
-- **Time**: 24 hours (adjust based on your analysis complexity)
-- **CPUs**: 8 cores
+| Parameter | Description | Default | Notes |
+|-----------|-------------|---------|-------|
+| `--roi` | Brain regions of interest | "1,2,3" | Corresponds to specific electrode channels |
+| `--freq_min/max` | Frequency range (Hz) | 1.0-45.0 | Theta: typically 3-8 Hz |
+| `--n_freqs` | Number of frequency bins | 256 | High-resolution spectral analysis |
+| `--n_cycles` | Morlet wavelet cycles | 5 | Fixed cycles across frequencies |
+| `--window_duration` | Event window (s) | 2.0 | Time around near-mistake events |
+
+---
+
+## 💾 Resource Requirements
+
+### **SLURM Job Resources:**
+- **Memory**: 128-256G per rat (adjustable based on frequency resolution)
+- **Time**: 24-48 hours per rat
 - **Storage**: ~5-10GB per rat for results
+- **CPUs**: 4-8 cores per job
 
-### Cluster Considerations:
-- Total jobs = number of rats
-- Each job is independent (fault tolerant)
-- Failed jobs can be resubmitted individually
-- Results are saved per rat in separate directories
+### **Total Project Scale:**
+- **Rats**: ~14 subjects
+- **Sessions**: 300+ total across all rats  
+- **Frequencies**: 264 frequency bins (1.01-45.00 Hz)
+- **Final output**: Cross-rat spectrograms and statistical aggregations
 
-## File Structure After Submission
+---
+
+## 📁 Output Structure
 
 ```
-project_dir/
-├── logs/
-│   ├── analysis_rat_<RAT_ID>.log
-│   ├── memory_rat_<RAT_ID>.log
-│   └── nm_theta_rat_<JOB_ID>_<ARRAY_ID>.out
-├── results/
-│   ├── rat_<RAT_ID>/
-│   │   ├── cross_rats_aggregated_results.pkl
-│   │   ├── cross_rats_spectrograms.png
-│   │   └── COMPLETED (success marker)
-│   └── rat_<RAT_ID>/
-│       ├── analysis_files...
-│       └── FAILED (failure marker)
-├── rat_config.json
-└── monitor_jobs.sh
+results/
+├── rat_1055/
+│   ├── multi_session_results.pkl    # Aggregated sessions for this rat
+│   ├── session_*/                   # Individual session results
+│   └── COMPLETED                    # Success marker
+├── rat_9591/
+│   └── ...
+└── cross_rats_aggregated/
+    ├── cross_rats_aggregated_results.pkl
+    ├── cross_rats_spectrograms.png
+    └── analysis_metadata.json
 ```
 
-## Common Parameters
+---
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `--roi` | ROI specification | "1,2,3" |
-| `--freq_min` | Minimum frequency (Hz) | 1.0 |
-| `--freq_max` | Maximum frequency (Hz) | 45.0 |
-| `--window_duration` | Event window duration (s) | 2.0 |
-| `--memory_per_job` | Memory per job | 128G |
-| `--time_limit` | Time limit per job | 24:00:00 |
-| `--partition` | SLURM partition | cpu |
+## 🔍 Monitoring & Troubleshooting
 
-## Troubleshooting
-
-### Common Issues:
-
-1. **Memory errors**: Increase `--memory_per_job`
-2. **Time limit exceeded**: Increase `--time_limit`
-3. **Missing data file**: Check `--data_path` and file permissions
-4. **Module loading issues**: Adjust module commands in `slurm_array_job.sh`
-
-### Checking Job Status:
+### **Job Monitoring:**
 ```bash
-# Overall status
-squeue -u $USER
+# Check job status
+squeue -u $USER --name=nm_theta_array
 
-# Specific job details
+# Monitor specific job
 scontrol show job <JOB_ID>
 
-# Check individual rat results
+# Check results
 ls results/rat_*/COMPLETED
 ls results/rat_*/FAILED
 ```
 
-### Resubmitting Failed Jobs:
-```bash
-# Find failed array tasks
-sacct -j <JOB_ID> --format=JobID,State | grep FAILED
+### **Common Issues:**
+- **Memory errors**: Increase `--memory_per_job` to 384G
+- **Time limits**: Extend `--time_limit` to 72:00:00  
+- **ROI compatibility**: Some rats may have different channel mappings
+- **Partial failures**: Use recovery scripts to salvage successful sessions
 
-# Resubmit specific array tasks
-sbatch --array=<FAILED_TASK_IDS> scripts/slurm_array_job_configured.sh
-```
+---
 
-## Migration from Old Scripts
+## 🧬 Analysis Details
 
-The old `batch_processing_strategies.py` and `hpc_config.py` scripts have been replaced with this simpler system. The new approach:
+### **Workflow Steps:**
+1. **Preprocessing**: Morlet wavelet transform on EEG signals
+2. **Event detection**: Identify near-mistake behavioral events
+3. **Spectral analysis**: Compute time-frequency representations
+4. **Session aggregation**: Average across sessions within each rat
+5. **Cross-rat analysis**: Statistical aggregation across all subjects
+6. **Visualization**: Generate spectrograms and statistical plots
 
-- ✅ Works with current `nm_theta_cross_rats.py` 
-- ✅ Simpler configuration
-- ✅ Better fault tolerance
-- ✅ Easier monitoring
-- ✅ Automatic rat discovery
+### **Scientific Output:**
+- **Individual rat results**: Session-averaged spectrograms per rat
+- **Cross-rat spectrograms**: Population-level theta activity patterns
+- **Statistical analysis**: Mean ± SEM across subjects
+- **Colormap range**: Optimized for theta power visualization ([-0.42, 0.22])
 
-## Advanced Usage
+---
 
-### Processing Subset of Rats:
-```bash
-# Edit rat_config.json manually to include only desired rats
-# Then submit normally
-```
+## 🔬 Technical Notes
 
-### Custom Analysis Parameters:
-```bash
-python scripts/submit_array_jobs.py \
-  --data_path /path/to/data.pkl \
-  --project_dir /path/to/project \
-  --save_path /path/to/results \
-  --roi "frontal" \
-  --freq_min 4.0 \
-  --freq_max 8.0 \
-  --window_duration 1.0
-```
+- **Frequency resolution**: 256 frequencies for high-resolution analysis
+- **Wavelet parameters**: 5 cycles fixed across all frequencies for consistent temporal resolution
+- **Memory optimization**: Results processed in chunks to handle 17GB+ datasets
+- **Fault tolerance**: Each rat processed independently; failed jobs can be resubmitted
+- **Compatibility**: Handles different channel mappings across rat subjects
 
-### Different Memory Requirements:
-```bash
-# For high-frequency analysis
---memory_per_job 384G --time_limit 72:00:00
+---
 
-# For quick testing
---memory_per_job 64G --time_limit 12:00:00
-```
+## 📚 Dependencies
 
-## Results Recovery from Partial SLURM Failures
-
-Sometimes SLURM jobs fail partially, leaving some sessions processed but missing the final `multi_session_results.pkl` file. The new recovery scripts help you salvage these partial results.
-
-### Scenario: Partial Job Success
-
-If your SLURM job processes individual sessions but fails before creating `multi_session_results.pkl`, you'll have:
-```
-results/rat_531_multi_session_mne/
-├── session_161/
-│   └── nm_roi_theta_analysis_results.pkl  ✓ SUCCESS
-├── session_162/
-│   └── nm_roi_theta_analysis_results.pkl  ✓ SUCCESS
-├── session_163/
-│   └── nm_roi_theta_analysis_results.pkl  ✓ SUCCESS
-└── multi_session_results.pkl              ✗ MISSING
-```
-
-### Recovery Options:
-
-#### 1. Quick Recovery (Single Rat):
-```bash
-python scripts/aggregate_sessions_to_multi.py \
-  --rat_dir results/rat_531_multi_session_mne \
-  --verbose
-```
-
-#### 2. Batch Recovery (Multiple Rats):
-```bash
-python scripts/batch_aggregate_sessions.py \
-  --results_dir results/ \
-  --verbose
-```
-
-#### 3. Complete Workflow Recovery:
-```bash
-python scripts/results_recovery_workflow.py \
-  --results_dir results/ \
-  --roi "1,2,3" \
-  --freq_min 3.0 \
-  --freq_max 8.0 \
-  --verbose
-```
-
-### Recovery Workflow Steps:
-
-The complete recovery workflow:
-1. **Analyzes** current results state (completed/partial/failed rats)
-2. **Aggregates** individual sessions into `multi_session_results.pkl` 
-3. **Runs** cross-rat analysis to create final visualizations
-
-### Example Recovery Session:
-
-```bash
-# Check what can be recovered
-python scripts/results_recovery_workflow.py \
-  --results_dir /path/to/results \
-  --verbose
-
-# Expected output:
-#   ✅ Completed rats: 3 (have multi_session_results.pkl)
-#   🔄 Partial rats: 5 (have session results, missing multi_session)
-#   ❌ Failed rats: 2 (no usable results)
-```
-
-### When to Use Recovery Scripts:
-
-- **After SLURM timeouts**: Jobs ran out of time but processed some sessions
-- **After memory errors**: Jobs crashed but individual sessions succeeded  
-- **After node failures**: Hardware issues interrupted multi-session aggregation
-- **For selective processing**: You want results from successful sessions only
-
-### Recovery Script Details:
-
-#### `aggregate_sessions_to_multi.py`
-- Processes a single rat directory
-- Aggregates individual `nm_roi_theta_analysis_results.pkl` files
-- Creates `multi_session_results.pkl` for cross-rat analysis
-- Validates session compatibility before aggregation
-
-#### `batch_aggregate_sessions.py`  
-- Processes multiple rat directories at once
-- Automatically detects which rats need session aggregation
-- Skips rats that already have up-to-date `multi_session_results.pkl`
-- Provides batch processing with error handling
-
-#### `results_recovery_workflow.py`
-- Complete end-to-end recovery workflow
-- Analyzes current state and shows recovery potential
-- Runs session aggregation and cross-rat analysis
-- Provides recommendations for next steps
+- **Core**: `numpy`, `scipy`, `matplotlib`, `mne`, `pickle`
+- **Cluster**: SLURM workload manager
+- **Storage**: High-capacity storage for intermediate and final results
+- **Environment**: Python 3.8+ with scientific computing stack

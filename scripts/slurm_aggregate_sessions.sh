@@ -70,7 +70,7 @@ echo "Starting session aggregation..."
 echo "==============================================="
 
 # Run the batch aggregation
-python3 scripts/simple_batch_aggregate.py \
+python3 scripts/aggregate_sessions_batch.py \
     --results_dir "$RESULTS_DIR" \
     --verbose
 

@@ -1,1 +1,0 @@
-# Parallelism testing package for EEG analysis

@@ -792,21 +792,28 @@ def main():
 if __name__ == "__main__":
     # Check if we're running in IDE mode or command line mode
     import sys
-    
+    import time
+
     if len(sys.argv) > 1:
         # Command line usage
+        start_time = time.time()
         main()
+        end_time = time.time()
+        print(f"Total elapsed time: {end_time - start_time:.2f} seconds")
     else:
         # IDE usage - run analysis directly
         from config import DataConfig
-        
+
         data_path = DataConfig.get_data_file_path(DataConfig.MAIN_EEG_DATA_FILE)
-        
+
+        start_time = time.time()
         results = run_cross_rats_3_7hz_analysis(
-            roi="1",
+            roi="3",
             pkl_path=data_path,
             freq_file_path="data/config/frequencies.txt",
             rat_ids=None,
             save_path="results/cross_rats_3_7hz",
             verbose=True
         )
+        end_time = time.time()
+        print(f"Total elapsed time: {end_time - start_time:.2f} seconds")

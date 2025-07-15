@@ -1581,7 +1581,8 @@ if __name__ == "__main__":
     # Check if we're running in IDE mode (with direct function calls)
     # or command line mode
     import sys
-    
+    import time  # Add time import for timing
+
     # If there are command line arguments, use command line mode
     if len(sys.argv) > 1:
         # For command line usage, call main()
@@ -1599,19 +1600,20 @@ if __name__ == "__main__":
         print(f"🔍 Debug - Data file path: {data_path}")
         print(f"🔍 Debug - File exists: {os.path.exists(data_path)}")
 
-    
+        start_time = time.time()
         results = run_cross_rats_analysis(
-            roi="1,2",                   # Change ROI here
+            roi="11",                   # Change ROI here
             pkl_path=data_path,               # Keep explicit path
-            freq_min=1.0,                     # Override config - test narrow theta
-            freq_max=2.0,                     # Override config
-            #n_freqs=60,                       # Override config - faster analysis
-            freq_file_path="data/config/frequencies_128.txt",  # Use frequencies from file instead of n_freqs
-            rat_ids=["9442","441"],
-            window_duration=2.0,              # Override config - longer window
+            freq_min=2.0,                     # Override config - test narrow theta
+            freq_max=10.0,                     # Override config
+            n_freqs=50,                       # Override config - faster analysis
+            #freq_file_path="data/config/frequencies_128.txt",  # Use frequencies from file instead of n_freqs
+            rat_ids=None,
+            window_duration=1.0,              # Override config - longer window
             save_path="D:/nm_theta_results",  # Save to D: 
             cleanup_intermediate_files=True,  # Cleanup session folders (saves space)
             verbose=True                      # Override config
         )
-        
+        end_time = time.time()
+        print(f"Total elapsed time: {end_time - start_time:.2f} seconds")
 

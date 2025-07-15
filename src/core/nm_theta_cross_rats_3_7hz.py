@@ -808,7 +808,7 @@ if __name__ == "__main__":
 
         start_time = time.time()
         results = run_cross_rats_3_7hz_analysis(
-            roi="3",
+            roi="11",
             pkl_path=data_path,
             freq_file_path="data/config/frequencies.txt",
             rat_ids=None,

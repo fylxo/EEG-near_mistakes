@@ -160,7 +160,7 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
     freqs = np.geomspace(freq_range[0], freq_range[1], n_freqs)
     #n_cycles = np.maximum(3, freqs * n_cycles_factor)
     #n_cycles = np.linspace(3, 10, len(freqs))
-    n_cycles = np.full(len(freqs), 5.0)
+    n_cycles = np.full(len(freqs), 3.5)
 
 
     # Print exact frequencies being used

@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 """
-Cross-Rats NM Theta Analysis - Baseline Normalization Version
+Cross-Rats NM Theta Analysis
 
 This script performs NM theta analysis across multiple rats, aggregating results
 from individual rat multi-session analyses.
 
-Key Difference from Original:
-- Uses pre-event baseline normalization (-0.8 to -0.4 seconds) instead of global statistics
-- Extracts statistics from -0.8 to -0.4 seconds window before each event
-- Normalizes the full -1 to +1 second window using these baseline statistics
-
-Author: Generated for cross-rats EEG near-mistake analysis with baseline normalization
+Author: Generated for cross-rats EEG near-mistake analysis
 """
 
 import os
@@ -34,168 +29,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import configuration
 from config import AnalysisConfig, DataConfig, PlottingConfig
 
-# Import baseline normalization functions
-from baseline_normalization import (
-    compute_baseline_statistics, 
-    normalize_windows_baseline,
-    extract_nm_event_windows_with_baseline,
-    analyze_session_with_baseline_normalization
-)
+# Import the run_analysis function from nm_theta_analyzer
+from nm_theta_analyzer import run_analysis
 
-# Add global variable to store original extract_nm_event_windows
-_original_extract_nm_event_windows = None
-
-# Create a modified run_analysis function that uses baseline normalization
-def run_analysis_baseline(*args, **kwargs):
-    """
-    Modified run_analysis function that uses baseline normalization instead of global.
-    This patches the core functions to use baseline normalization.
-    """
-    # Import here to avoid circular imports
-    from nm_theta_analyzer import run_analysis as original_run_analysis
-    
-    # Remove the normalization_method parameter if it exists (original function doesn't accept it)
-    if 'normalization_method' in kwargs:
-        del kwargs['normalization_method']
-    
-    # Patch the core functions to use baseline normalization
-    patch_core_functions_for_baseline()
-    
-    try:
-        # Call original function with patched core functions
-        return original_run_analysis(*args, **kwargs)
-    finally:
-        # Restore original functions
-        restore_original_functions()
-
-
-def patch_core_functions_for_baseline():
-    """
-    Temporarily patch core functions to use baseline normalization.
-    """
-    import nm_theta_single_basic
-    import nm_theta_multi_session
-    global _original_extract_nm_event_windows
-    
-    # Store original functions
-    if not hasattr(patch_core_functions_for_baseline, 'original_functions'):
-        patch_core_functions_for_baseline.original_functions = {
-            'compute_global_statistics': getattr(nm_theta_single_basic, 'compute_global_statistics', None),
-            'normalize_windows': getattr(nm_theta_single_basic, 'normalize_windows', None),
-            'extract_nm_event_windows': getattr(nm_theta_single_basic, 'extract_nm_event_windows', None),
-        }
-    
-    # Save the original extract_nm_event_windows for use in the wrapper
-    if _original_extract_nm_event_windows is None:
-        _original_extract_nm_event_windows = patch_core_functions_for_baseline.original_functions['extract_nm_event_windows']
-    
-    # Replace with baseline versions
-    if hasattr(nm_theta_single_basic, 'compute_global_statistics'):
-        nm_theta_single_basic.compute_global_statistics = compute_baseline_statistics_wrapper
-    if hasattr(nm_theta_single_basic, 'normalize_windows'):
-        nm_theta_single_basic.normalize_windows = normalize_windows_baseline_wrapper
-    if hasattr(nm_theta_single_basic, 'extract_nm_event_windows'):
-        nm_theta_single_basic.extract_nm_event_windows = extract_nm_event_windows_baseline_wrapper
-
-
-def restore_original_functions():
-    """
-    Restore original functions after baseline analysis.
-    """
-    import nm_theta_single_basic
-    global _original_extract_nm_event_windows
-    
-    if hasattr(patch_core_functions_for_baseline, 'original_functions'):
-        orig_funcs = patch_core_functions_for_baseline.original_functions
-        
-        if orig_funcs['compute_global_statistics'] and hasattr(nm_theta_single_basic, 'compute_global_statistics'):
-            nm_theta_single_basic.compute_global_statistics = orig_funcs['compute_global_statistics']
-        if orig_funcs['normalize_windows'] and hasattr(nm_theta_single_basic, 'normalize_windows'):
-            nm_theta_single_basic.normalize_windows = orig_funcs['normalize_windows']
-        if orig_funcs['extract_nm_event_windows'] and hasattr(nm_theta_single_basic, 'extract_nm_event_windows'):
-            nm_theta_single_basic.extract_nm_event_windows = orig_funcs['extract_nm_event_windows']
-    
-    # Restore the global reference
-    _original_extract_nm_event_windows = None
-
-
-def compute_baseline_statistics_wrapper(power: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Wrapper that maintains the original interface but uses baseline statistics.
-    For now, return dummy values - the real baseline computation happens in normalize_windows.
-    """
-    # Return dummy global statistics - baseline stats will be computed per-event
-    global_mean = np.mean(power, axis=1)
-    global_std = np.std(power, axis=1)
-    global_std = np.maximum(global_std, 1e-12)
-    return global_mean, global_std
-
-
-def normalize_windows_baseline_wrapper(nm_windows: Dict, global_mean: np.ndarray, global_std: np.ndarray) -> Dict:
-    """
-    Wrapper that uses baseline normalization instead of global normalization.
-    """
-    # Convert to the format expected by baseline normalization
-    normalized_windows = {}
-    
-    for nm_size, data in nm_windows.items():
-        windows = data['windows']  # (n_events, n_freqs, n_times)
-        window_times = data.get('window_times', np.linspace(-1.0, 1.0, windows.shape[2]))
-        
-        # Apply baseline normalization to each event
-        normalized_events = []
-        
-        for event_idx in range(windows.shape[0]):
-            event_window = windows[event_idx]  # (n_freqs, n_times)
-            
-            # Extract baseline period (-1.0 to -0.5 seconds)
-            baseline_mask = (window_times >= -1.0) & (window_times <= -0.5)
-            
-            if np.any(baseline_mask):
-                # Compute baseline statistics for this event
-                baseline_data = event_window[:, baseline_mask]  # (n_freqs, baseline_times)
-                baseline_mean = np.mean(baseline_data, axis=1, keepdims=True)  # (n_freqs, 1)
-                baseline_std = np.std(baseline_data, axis=1, keepdims=True)    # (n_freqs, 1)
-                baseline_std = np.maximum(baseline_std, 1e-12)  # Avoid division by zero
-                
-                # Normalize entire event using baseline statistics
-                normalized_event = (event_window - baseline_mean) / baseline_std
-            else:
-                # Fallback to global normalization if no baseline period found
-                mean_expanded = global_mean[:, np.newaxis]
-                std_expanded = global_std[:, np.newaxis]
-                normalized_event = (event_window - mean_expanded) / std_expanded
-            
-            normalized_events.append(normalized_event)
-        
-        # Convert back to original format
-        normalized_windows[nm_size] = {
-            **data,  # Copy all original data
-            'windows': np.array(normalized_events),  # Replace with normalized windows
-            'normalization_method': 'baseline',
-            'baseline_window': (-1.0, -0.5)
-        }
-    
-    return normalized_windows
-
-
-def extract_nm_event_windows_baseline_wrapper(power: np.ndarray, times: np.ndarray, 
-                                             nm_peak_times: np.ndarray, nm_sizes: np.ndarray,
-                                             window_duration: float = 1.0) -> Dict:
-    """
-    Wrapper that extracts windows with baseline normalization.
-    """
-    global _original_extract_nm_event_windows
-    if _original_extract_nm_event_windows is None:
-        raise RuntimeError("Original extract_nm_event_windows function not saved before patching.")
-    # Call the original extraction function (not the patched one)
-    nm_windows = _original_extract_nm_event_windows(power, times, nm_peak_times, nm_sizes, window_duration)
-    # Add window_times to each window for baseline normalization
-    for nm_size, data in nm_windows.items():
-        if 'window_times' not in data:
-            n_times = data['windows'].shape[2]
-            data['window_times'] = np.linspace(-window_duration/2, window_duration/2, n_times)
-    return nm_windows
+# Import interactive visualization
+from interactive_spectrogram import add_interactive_to_results
 
 # Import session resilience system (simplified - now built into nm_theta_multi_session)
 # from session_resilience import SessionProcessor
@@ -697,14 +535,14 @@ def process_single_rat_multi_session(
     n_freqs: int = 30,
     window_duration: float = 1.0,
     n_cycles_factor: float = 3.0,
-    base_save_path: str = 'results/cross_rats_baseline',
+    base_save_path: str = 'results/cross_rats',
     show_plots: bool = False,
     method: str = 'mne',
     cleanup_intermediate_files: bool = True,
     verbose: bool = True
 ) -> Tuple[str, Optional[Dict]]:
     """
-    Process multi-session analysis for a single rat using nm_theta_analyzer_baseline.
+    Process multi-session analysis for a single rat using nm_theta_analyzer.
     
     Parameters:
     -----------
@@ -741,9 +579,8 @@ def process_single_rat_multi_session(
         Multi-session results for the rat, or None if failed
     """
     if verbose:
-        print(f"\n🐀 Processing rat {rat_id} - Multi-session analysis (BASELINE NORMALIZATION)")
+        print(f"\n🐀 Processing rat {rat_id} - Multi-session analysis")
         print(f"    Method: {method.upper()} (MNE-Python)")
-        print(f"    Normalization: Pre-event baseline (-1.0 to -0.5 seconds)")
         if rat_id == '9442':
             print(f"    Special handling: Mixed 32/20 channel sessions")
         print(f"    Session resilience: Built-in (up to 2 retries per session)")
@@ -751,7 +588,7 @@ def process_single_rat_multi_session(
     
     try:
         # Create save path for this rat
-        rat_save_path = os.path.join(base_save_path, f'rat_{rat_id}_baseline_{method}')
+        rat_save_path = os.path.join(base_save_path, f'rat_{rat_id}_multi_session_{method}')
         
         # Special handling for rat 9442
         if rat_id == '9442':
@@ -771,8 +608,8 @@ def process_single_rat_multi_session(
             mapping_df = None
         
         if method == 'mne':
-            # Use baseline analysis with built-in lightweight resilience
-            results = run_analysis_baseline(
+            # Use original analysis with built-in lightweight resilience
+            results = run_analysis(
                 mode='multi',
                 method='basic',  # method ignored for multi-session
                 parallel_type=None,
@@ -922,7 +759,7 @@ def aggregate_cross_rats_results(
     
     # Create comprehensive results dictionary
     aggregated_results = {
-        'analysis_type': 'cross_rats_baseline',
+        'analysis_type': 'cross_rats',
         'rat_ids': list(valid_results.keys()),
         'n_rats': n_valid_rats,
         'roi_specification': roi_specification,
@@ -933,8 +770,7 @@ def aggregate_cross_rats_results(
             'frequency_range': freq_range,
             'n_frequencies': n_freqs,
             'window_duration': first_result['analysis_parameters']['window_duration'],
-            'normalization': 'baseline',  # Changed from global to baseline
-            'baseline_window': (-1.0, -0.5)  # Added baseline window specification
+            'normalization': first_result['analysis_parameters']['normalization']
         },
         'processing_info': {
             'n_rats_attempted': len(rat_results),
@@ -947,15 +783,15 @@ def aggregate_cross_rats_results(
     # Save aggregated results
     os.makedirs(save_path, exist_ok=True)
     
-    results_file = os.path.join(save_path, 'cross_rats_baseline_aggregated_results.pkl')
+    results_file = os.path.join(save_path, 'cross_rats_aggregated_results.pkl')
     with open(results_file, 'wb') as f:
         pickle.dump(aggregated_results, f)
     
     if verbose:
-        print(f"✓ Cross-rats baseline results saved to: {results_file}")
+        print(f"✓ Cross-rats results saved to: {results_file}")
     
     # Save summary statistics
-    summary_file = os.path.join(save_path, 'cross_rats_baseline_summary.json')
+    summary_file = os.path.join(save_path, 'cross_rats_summary.json')
     summary_data = {
         'n_rats': n_valid_rats,
         'rat_ids': list(valid_results.keys()),
@@ -966,9 +802,7 @@ def aggregate_cross_rats_results(
                                     for nm_size, data in final_aggregated_windows.items()},
         'frequency_range': freq_range,
         'roi_specification': str(roi_specification),
-        'roi_channels': first_result['roi_channels'].tolist() if hasattr(first_result['roi_channels'], 'tolist') else first_result['roi_channels'],
-        'normalization_method': 'baseline',
-        'baseline_window': [-1.0, -0.5]
+        'roi_channels': first_result['roi_channels'].tolist() if hasattr(first_result['roi_channels'], 'tolist') else first_result['roi_channels']
     }
     
     with open(summary_file, 'w') as f:
@@ -1017,7 +851,7 @@ def calculate_color_limits(spectrograms: List[np.ndarray], percentile: float = 9
 
 def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: bool = True):
     """
-    Create comprehensive visualizations for cross-rats baseline results.
+    Create comprehensive visualizations for cross-rats results.
     
     Parameters:
     -----------
@@ -1029,7 +863,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
         Whether to print visualization progress (default: True)
     """
     if verbose:
-        print(f"\n📈 Creating cross-rats baseline visualizations")
+        print(f"\n📈 Creating cross-rats visualizations")
         print("=" * 60)
     
     os.makedirs(save_path, exist_ok=True)
@@ -1079,13 +913,9 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
         im = ax.pcolormesh(window_times, log_frequencies, avg_spectrogram,
                           shading='auto', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
         ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
-        
-        # Add baseline window markers
-        ax.axvspan(-1.0, -0.5, alpha=0.2, color='red', label='Baseline Window')
-        
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Frequency (Hz)')
-        ax.set_title(f'NM Size {nm_size} - Average Across {n_rats} Rats (Baseline Normalized)\n'
+        ax.set_title(f'NM Size {nm_size} - Average Across {n_rats} Rats\n'
                     f'Total Events: {window_data["total_events_all_rats"]}, '
                     f'Sessions: {window_data["total_sessions_all_rats"]}')
         
@@ -1114,27 +944,22 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
         
         ax.set_yticklabels(freq_labels)
         
-        # Add legend only for the first subplot
-        if i == 0:
-            ax.legend(loc='upper right')
-        
-        plt.colorbar(im, ax=ax, label='Z-score (Baseline)')
+        plt.colorbar(im, ax=ax, label='Z-score')
     
     # Add overall title
     roi_str = f"ROI: {results['roi_specification']} (channels: {roi_channels})"
     freq_str = f"Freq: {results['analysis_parameters']['frequency_range'][0]}-{results['analysis_parameters']['frequency_range'][1]} Hz"
-    norm_str = "Normalization: Baseline (-1.0 to -0.5s)"
     
-    plt.suptitle(f'Cross-Rats NM Theta Analysis - Baseline Normalization\n{roi_str}, {freq_str}\n{norm_str}', fontsize=14)
+    plt.suptitle(f'Cross-Rats NM Theta Analysis\n{roi_str}, {freq_str}', fontsize=14)
     
     # Apply custom spacing parameters for better plot layout
     plt.subplots_adjust(left=0.052, bottom=0.07, right=0.55, top=0.924, wspace=0.206, hspace=0.656)
     
     # Save plot
-    plot_file = os.path.join(save_path, 'cross_rats_baseline_spectrograms.png')
+    plot_file = os.path.join(save_path, 'cross_rats_spectrograms.png')
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
     if verbose:
-        print(f"✓ Baseline spectrograms saved to: {plot_file}")
+        print(f"✓ Spectrograms saved to: {plot_file}")
     
     plt.show()
     
@@ -1164,10 +989,6 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
                 im = ax.pcolormesh(window_times, log_frequencies, avg_spectrogram,
                                   shading='auto', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
                 ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
-                
-                # Add baseline window markers
-                ax.axvspan(-1.0, -0.5, alpha=0.2, color='red', label='Baseline Window')
-                
                 ax.set_xlabel('Time (s)')
                 ax.set_ylabel('Frequency (Hz)')
                 ax.set_title(f'Rat {rat_id} (Average Pattern)\nEvents: {window_data["total_events_per_rat"][j]}, '
@@ -1198,26 +1019,27 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
                 
                 ax.set_yticklabels(freq_labels)
                 
-                plt.colorbar(im, ax=ax, label='Z-score (Baseline)')
+                plt.colorbar(im, ax=ax, label='Z-score')
             
             # Hide unused subplots
             for j in range(n_rats_to_show, 6):
                 axes[j].set_visible(False)
             
-            plt.suptitle(f'Individual Rat Contributions - NM Size {nm_size} (Baseline Normalized)\n{roi_str}, {freq_str}\n{norm_str}\n(Note: Showing average pattern with individual rat statistics)', fontsize=14)
+            plt.suptitle(f'Individual Rat Contributions - NM Size {nm_size}\n{roi_str}, {freq_str}\n(Note: Showing average pattern with individual rat statistics)', fontsize=14)
             
             # Apply custom spacing parameters for individual rats plot
             plt.subplots_adjust(left=0.052, bottom=0.07, right=0.55, top=0.924, wspace=0.206, hspace=0.656)
             
-            individual_plot_file = os.path.join(save_path, f'individual_rats_baseline_nm_{nm_size}.png')
+            individual_plot_file = os.path.join(save_path, f'individual_rats_nm_{nm_size}.png')
             plt.savefig(individual_plot_file, dpi=300, bbox_inches='tight')
             if verbose:
-                print(f"✓ Individual rats baseline summary plot saved to: {individual_plot_file}")
+                print(f"✓ Individual rats summary plot saved to: {individual_plot_file}")
             
             plt.show()
         else:
             if verbose:
                 print("⚠️  Individual rat plots skipped (no rats to display)")
+
 
 
 def run_cross_rats_analysis(
@@ -1237,7 +1059,7 @@ def run_cross_rats_analysis(
     verbose: bool = None
 ) -> Dict:
     """
-    Run cross-rats NM theta analysis with baseline normalization.
+    Run cross-rats NM theta analysis with direct parameter specification.
     
     Parameters:
     -----------
@@ -1289,7 +1111,7 @@ def run_cross_rats_analysis(
     if n_cycles_factor is None:
         n_cycles_factor = AnalysisConfig.N_CYCLES_FACTOR_DEFAULT
     if save_path is None:
-        save_path = DataConfig.get_default_save_path('cross_rats_baseline')
+        save_path = DataConfig.get_default_save_path('cross_rats')
     if show_plots is None:
         show_plots = AnalysisConfig.CROSS_RATS_SHOW_PLOTS
     if method is None:
@@ -1335,13 +1157,12 @@ def run_cross_rats_analysis(
     n_freqs_analysis = actual_n_freqs
     
     if verbose:
-        print("🧠 Cross-Rats NM Theta Analysis - BASELINE NORMALIZATION")
+        print("🧠 Cross-Rats NM Theta Analysis")
         print("=" * 80)
         print(f"Data file: {pkl_path}")
         print(f"ROI: {roi}")
         print(f"Frequency range: {freq_min_analysis:.2f}-{freq_max_analysis:.2f} Hz ({n_freqs_analysis} freqs)")
         print(f"Window duration: {window_duration}s")
-        print(f"Normalization: Pre-event baseline (-1.0 to -0.5 seconds)")
         print(f"Method: {method.upper()} (MNE-Python)")
         print(f"Save path: {save_path}")
         print("=" * 80)
@@ -1431,14 +1252,27 @@ def run_cross_rats_analysis(
         verbose=verbose
     )
     
+    # Create interactive spectrograms
+    if verbose:
+        print("\n📊 Creating interactive spectrograms...")
+    try:
+        interactive_figs = add_interactive_to_results(
+            results=aggregated_results,
+            save_path=save_path
+        )
+        if verbose:
+            print("✓ Interactive spectrograms created! Open HTML files in browser to hover and see values.")
+    except Exception as e:
+        if verbose:
+            print(f"⚠️  Could not create interactive spectrograms: {e}")
+    
     # Print analysis completion and error summary
     print("\n" + "=" * 80)
-    print("📊 BASELINE ANALYSIS SUMMARY")
+    print("📊 ANALYSIS SUMMARY")
     print("=" * 80)
     print(f"Total rats attempted: {len(rat_ids)}")
     print(f"Successfully processed: {len(successful_rats)}")
     print(f"Failed to process: {len(failed_rats)}")
-    print(f"Normalization method: Pre-event baseline (-1.0 to -0.5 seconds)")
     
     if successful_rats:
         print(f"\n✅ Successful rats: {successful_rats}")
@@ -1450,12 +1284,11 @@ def run_cross_rats_analysis(
             print(f"  • Rat {rat_id}: {error}")
     
     if len(successful_rats) > 0:
-        print("\n✅ Cross-rats baseline analysis completed successfully!")
+        print("\n✅ Cross-rats analysis completed successfully!")
         if verbose:
             print(f"Results saved to: {save_path}")
             print(f"\nDetailed Summary:")
             print(f"  Method used: {method.upper()} (MNE-Python)")
-            print(f"  Normalization: Pre-event baseline (-1.0 to -0.5 seconds)")
             print(f"  Rats successfully processed: {aggregated_results['n_rats']}")
             print(f"  Successful rat IDs: {aggregated_results['rat_ids']}")
             print(f"  NM sizes analyzed: {[float(key) for key in aggregated_results['averaged_windows'].keys()]}")
@@ -1468,22 +1301,22 @@ def run_cross_rats_analysis(
 
 def main():
     """
-    Main function for cross-rats NM theta analysis with baseline normalization.
+    Main function for cross-rats NM theta analysis.
     Supports both command line arguments and direct parameter modification.
     """
     parser = argparse.ArgumentParser(
-        description='Cross-Rats NM Theta Analysis - Baseline Normalization',
+        description='Cross-Rats NM Theta Analysis',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Analyze frontal ROI across all rats with baseline normalization
-  python nm_theta_cross_rats_baseline.py --roi frontal --freq_min 3 --freq_max 8
+  # Analyze frontal ROI across all rats
+  python nm_theta_cross_rats.py --roi frontal --freq_min 3 --freq_max 8
   
-  # Analyze specific channels across all rats with baseline normalization
-  python nm_theta_cross_rats_baseline.py --roi "1,2,3" --freq_min 1 --freq_max 12
+  # Analyze specific channels across all rats
+  python nm_theta_cross_rats.py --roi "1,2,3" --freq_min 1 --freq_max 12
   
-  # Analyze hippocampus with custom parameters and baseline normalization
-  python nm_theta_cross_rats_baseline.py --roi hippocampus --freq_min 6 --freq_max 10 --n_freqs 20
+  # Analyze hippocampus with custom parameters
+  python nm_theta_cross_rats.py --roi hippocampus --freq_min 6 --freq_max 10 --n_freqs 20
         """
     )
     
@@ -1558,6 +1391,208 @@ Examples:
     )
 
 
+def run_all_channels_analysis(
+    pkl_path: str = 'data/processed/all_eeg_data.pkl',
+    freq_min: float = 1.0,
+    freq_max: float = 45.0,
+    n_freqs: int = 30,
+    window_duration: float = 2.0,
+    n_cycles_factor: float = 3.0,
+    rat_ids: Optional[List[str]] = None,
+    base_save_path: str = 'results',
+    show_plots: bool = False,
+    channels: Optional[List[int]] = None
+) -> Dict[str, Dict]:
+    """
+    Run cross-rats NM theta analysis for all channels sequentially with memory cleanup.
+    
+    Parameters:
+    -----------
+    pkl_path : str
+        Path to main EEG data file
+    freq_min : float
+        Minimum frequency (Hz)
+    freq_max : float
+        Maximum frequency (Hz)
+    n_freqs : int
+        Number of frequencies
+    window_duration : float
+        Event window duration (s)
+    n_cycles_factor : float
+        Cycles factor for spectrograms
+    rat_ids : Optional[List[str]]
+        Specific rat IDs to process, None for all rats
+    base_save_path : str
+        Base directory for saving results
+    show_plots : bool
+        Show plots during processing
+    channels : Optional[List[int]]
+        Specific channels to process, None for all channels (1-32)
+        
+    Returns:
+    --------
+    all_results : Dict[str, Dict]
+        Dictionary mapping channel -> results for each channel
+    """
+    print("🧠 Cross-Rats NM Theta Analysis - All Channels")
+    print("=" * 80)
+    print(f"Data file: {pkl_path}")
+    print(f"Frequency range: {freq_min}-{freq_max} Hz ({n_freqs} freqs)")
+    print(f"Window duration: {window_duration}s")
+    print(f"Base save path: {base_save_path}")
+    print("=" * 80)
+    
+    # Define channels to process
+    if channels is None:
+        channels = list(range(1, 33))  # Channels 1-32
+    else:
+        channels = [int(ch) for ch in channels]
+    
+    print(f"📊 Processing {len(channels)} channels: {channels}")
+    
+    # Create main results directory
+    all_channels_dir = os.path.join(base_save_path, 'all_channels_analysis')
+    os.makedirs(all_channels_dir, exist_ok=True)
+    
+    # Create plots directory
+    plots_dir = os.path.join(all_channels_dir, 'plots')
+    os.makedirs(plots_dir, exist_ok=True)
+    
+    # Store results for all channels
+    all_results = {}
+    
+    # Discover rat IDs once
+    if rat_ids:
+        print(f"Using specified rat IDs: {rat_ids}")
+    else:
+        rat_ids = discover_rat_ids(pkl_path)
+    
+    for i, channel in enumerate(channels):
+        print(f"\n{'='*60}")
+        print(f"📡 Processing Channel {channel} ({i+1}/{len(channels)})")
+        print(f"{'='*60}")
+        
+        try:
+            # Create temporary directory for this channel
+            temp_save_path = os.path.join(base_save_path, 'cross_rats')
+            
+            # Run analysis for this channel
+            results = run_cross_rats_analysis(
+                roi=str(channel),
+                pkl_path=pkl_path,
+                freq_min=freq_min,
+                freq_max=freq_max,
+                n_freqs=n_freqs,
+                window_duration=window_duration,
+                n_cycles_factor=n_cycles_factor,
+                rat_ids=rat_ids,
+                save_path=temp_save_path,
+                show_plots=show_plots
+            )
+            
+            # Store results
+            all_results[f"channel_{channel}"] = results
+            
+            # Move plots to organized directory
+            channel_plots_dir = os.path.join(plots_dir, f'channel_{channel}')
+            os.makedirs(channel_plots_dir, exist_ok=True)
+            
+            # Move plot files
+            plot_files = [
+                'cross_rats_spectrograms.png',
+                'cross_rats_aggregated_results.pkl',
+                'cross_rats_summary.json'
+            ]
+            
+            for plot_file in plot_files:
+                src_path = os.path.join(temp_save_path, plot_file)
+                dst_path = os.path.join(channel_plots_dir, plot_file)
+                if os.path.exists(src_path):
+                    import shutil
+                    shutil.move(src_path, dst_path)
+            
+            # Move individual rat plots if they exist
+            for nm_size in results['averaged_windows'].keys():
+                individual_plot = f'individual_rats_nm_{nm_size}.png'
+                src_path = os.path.join(temp_save_path, individual_plot)
+                dst_path = os.path.join(channel_plots_dir, individual_plot)
+                if os.path.exists(src_path):
+                    import shutil
+                    shutil.move(src_path, dst_path)
+            
+            print(f"✓ Channel {channel} completed successfully")
+            print(f"  Results saved to: {channel_plots_dir}")
+            
+        except Exception as e:
+            print(f"❌ Error processing channel {channel}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            all_results[f"channel_{channel}"] = None
+            
+        finally:
+            # Clean up temporary files and memory
+            print(f"🧹 Cleaning up memory and temporary files for channel {channel}")
+            
+            # Remove temporary cross_rats directory
+            if os.path.exists(temp_save_path):
+                import shutil
+                try:
+                    shutil.rmtree(temp_save_path)
+                    print(f"  ✓ Removed temporary directory: {temp_save_path}")
+                except Exception as e:
+                    print(f"  ⚠️  Could not remove temporary directory: {e}")
+            
+            # Force garbage collection
+            gc.collect()
+            
+            # Small delay to ensure cleanup
+            import time
+            time.sleep(1)
+    
+    # Save comprehensive results
+    all_results_file = os.path.join(all_channels_dir, 'all_channels_results.pkl')
+    with open(all_results_file, 'wb') as f:
+        pickle.dump(all_results, f)
+    
+    # Create summary
+    successful_channels = [ch for ch, results in all_results.items() if results is not None]
+    failed_channels = [ch for ch, results in all_results.items() if results is None]
+    
+    summary = {
+        'total_channels': len(channels),
+        'successful_channels': len(successful_channels),
+        'failed_channels': len(failed_channels),
+        'successful_channel_list': [ch.split('_')[1] for ch in successful_channels],
+        'failed_channel_list': [ch.split('_')[1] for ch in failed_channels],
+        'analysis_parameters': {
+            'frequency_range': [freq_min, freq_max],
+            'n_frequencies': n_freqs,
+            'window_duration': window_duration,
+            'n_cycles_factor': n_cycles_factor
+        },
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    summary_file = os.path.join(all_channels_dir, 'all_channels_summary.json')
+    with open(summary_file, 'w') as f:
+        json.dump(summary, f, indent=2)
+    
+    print(f"\n{'='*80}")
+    print("✅ All Channels Analysis Completed!")
+    print(f"{'='*80}")
+    print(f"📊 Summary:")
+    print(f"  Total channels processed: {len(channels)}")
+    print(f"  Successful: {len(successful_channels)}")
+    print(f"  Failed: {len(failed_channels)}")
+    print(f"  Results directory: {all_channels_dir}")
+    print(f"  Plots directory: {plots_dir}")
+    
+    if failed_channels:
+        print(f"\n❌ Failed channels: {[ch.split('_')[1] for ch in failed_channels]}")
+    
+    return all_results
+
+
 # Example usage for IDE/notebook environment
 if __name__ == "__main__":
     # Check if we're running in IDE mode (with direct function calls)
@@ -1571,6 +1606,11 @@ if __name__ == "__main__":
         main()
     else:
         # For IDE usage, run the analysis directly
+        # Uncomment the line below to run all channels analysis
+        #all_results = run_all_channels_analysis()
+        
+        # Or run single channel analysis using configuration defaults
+        
         # Debug: Check data file path
         from config import DataConfig
         data_path = DataConfig.get_data_file_path(DataConfig.MAIN_EEG_DATA_FILE)
@@ -1579,15 +1619,18 @@ if __name__ == "__main__":
 
         start_time = time.time()
         results = run_cross_rats_analysis(
-            roi="11",                   # Change ROI here
+            roi="1,2,3",                   # Change ROI here
             pkl_path=data_path,               # Keep explicit path
-            freq_min=2.0,                     # Test narrow theta range
-            freq_max=10.0,                     # Test narrow theta range
-            n_freqs=50,                       # More frequencies for better resolution
-            window_duration=1.0,              # 1 second window around events
-            save_path="results/cross_rats_baseline",  # Baseline results directory
+            freq_min=1.0,                     # Override config - test narrow theta
+            freq_max=45.0,                     # Override config
+            n_freqs=40,                       # Override config - faster analysis
+            #freq_file_path="data/config/frequencies_128.txt",  # Use frequencies from file instead of n_freqs
+            rat_ids=None,
+            window_duration=1.0,              # Override config - longer window
+            save_path="D:/nm_theta_results",  # Save to D: 
             cleanup_intermediate_files=True,  # Cleanup session folders (saves space)
-            verbose=True                      # Detailed output
+            verbose=True                      # Override config
         )
         end_time = time.time()
         print(f"Total elapsed time: {end_time - start_time:.2f} seconds")
+

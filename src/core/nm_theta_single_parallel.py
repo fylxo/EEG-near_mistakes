@@ -80,6 +80,14 @@ def process_single_channel_threaded(args):
         )
         channel_power = power[0, 0, :, :]  # (n_freqs, n_times)
         
+        # Validate time axis alignment
+        original_time_length = len(eeg_channel)
+        if original_time_length != channel_power.shape[1]:
+            print(f"Warning: Time axis mismatch for channel {ch_idx}")
+            print(f"  Original signal length: {original_time_length}")
+            print(f"  Spectrogram time axis: {channel_power.shape[1]}")
+            print(f"  Difference: {original_time_length - channel_power.shape[1]} samples")
+        
         # Compute per-channel statistics for normalization
         ch_mean = np.mean(channel_power, axis=1)  # Mean per frequency
         ch_std = np.std(channel_power, axis=1)    # Std per frequency

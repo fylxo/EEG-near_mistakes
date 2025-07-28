@@ -297,17 +297,24 @@ def _extract_raw_windows(power: np.ndarray,
         if start_time >= times[0] and end_time <= times[-1]:
             # Find time indices
             start_idx = np.searchsorted(times, start_time)
-            end_idx = start_idx + window_samples
+            end_idx = np.searchsorted(times, end_time)
             
-            if end_idx <= len(times):
+            if end_idx <= len(times) and start_idx < end_idx:
                 # Extract window
                 window_power = power[:, start_idx:end_idx]
+                actual_samples = end_idx - start_idx
+                expected_samples = int((end_time - start_time) * 200)  # Based on 200Hz assumption
                 
-                if window_power.shape[1] == window_samples:
+                # Allow sample count variations due to timing precision (up to 5% tolerance)
+                max_tolerance = max(10, int(expected_samples * 0.05))  # At least 10 samples or 5%
+                if abs(actual_samples - expected_samples) <= max_tolerance:
                     nm_windows[event_size].append(window_power)
                     valid_events[event_size].append(i)
                 else:
-                    print(f"Warning: NM event {i} at {event_time:.2f}s has insufficient data")
+                    difference = abs(actual_samples - expected_samples)
+                    print(f"Warning: NM event {i} at {event_time:.2f}s has significant timing mismatch")
+                    print(f"  Expected samples: {expected_samples}, actual: {actual_samples} (diff: {difference})")
+                    print(f"  Tolerance exceeded: {difference} > {max_tolerance} samples")
             else:
                 print(f"Warning: NM event {i} at {event_time:.2f}s too close to recording end")
         else:

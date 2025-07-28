@@ -43,7 +43,7 @@ class AnalysisConfig:
     WINDOW_DURATION_EXTENDED = 2.0
     
     # Cycles factor for spectrograms (higher = better frequency resolution)
-    N_CYCLES_FACTOR_DEFAULT = 3.0
+    N_CYCLES_FACTOR_DEFAULT = 5.0
     
     # Time windows for specific analyses (seconds relative to event)
     THETA_POWER_TIME_WINDOW = (-0.2, 0.5)  # Pre to post event

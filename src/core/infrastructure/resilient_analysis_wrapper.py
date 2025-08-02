@@ -11,7 +11,7 @@ import gc
 import pickle
 import traceback
 from typing import Dict, List, Optional, Tuple, Union, Any
-from session_resilience import SessionProcessor
+from infrastructure.session_resilience import SessionProcessor
 
 def run_analysis_with_resilience(
     mode: str,

@@ -3,12 +3,16 @@ import numpy as np
 
 # ROI mapping based on the brain region information
 # This maps brain region names to their corresponding electrode numbers
+# Updated ROI definitions as of latest specification
 ROI_MAP = {
-    'frontal': [2, 29, 31, 32],
-    'motor': [1, 3, 5, 26, 28, 30],
-    'ss': [4, 6, 22, 27],  # somatosensory
-    'hippocampus': [7, 11, 15, 16, 17, 18],
-    'visual': [8, 9, 10, 12, 13, 14, 19, 20, 21, 23, 24, 25]
+    'mPFC': [8, 6, 9, 11],  # medial Prefrontal Cortex
+    'motor': [7, 10, 5, 12, 3, 14],  # Motor cortex
+    'somatomotor': [4, 13, 2, 15, 23, 24, 1, 16, 25, 26],  # Somatomotor cortex
+    'visual': [20, 21, 22, 27, 28, 29, 17, 18, 19, 30, 31, 32],  # Visual cortex
+    
+    # Keep legacy names for backward compatibility
+    'frontal': [8, 6, 9, 11],  # Alias for mPFC
+    'ss': [4, 13, 2, 15, 23, 24, 1, 16, 25, 26],  # Alias for somatomotor (somatosensory)
 }
 
 def load_electrode_mappings(csv_file='data/config/consistent_electrode_mappings.csv'):

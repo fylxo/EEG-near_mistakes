@@ -36,7 +36,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import AnalysisConfig, DataConfig, PlottingConfig
 
 # Import baseline normalization functions
-from baseline_normalization import (
+from normalization.baseline_normalization import (
     compute_baseline_statistics, 
     normalize_windows_baseline,
     extract_nm_event_windows_with_baseline,
@@ -44,68 +44,59 @@ from baseline_normalization import (
 )
 
 # Import interactive visualization
-from interactive_spectrogram import add_interactive_to_results
+from utils.interactive_spectrogram import add_interactive_to_results
+
+# Import fixed electrode mapping functions
+from utils.electrode_mapping_fixes import (
+    get_electrode_numbers_from_roi_fixed,
+    check_rat_9442_compatibility_fixed,
+    validate_electrode_mappings,
+    add_minimum_events_validation
+)
 
 # Add global variable to store original extract_nm_event_windows
 _original_extract_nm_event_windows = None
 
-# Create a modified run_analysis function that uses baseline normalization
+# Create a clean run_analysis function that uses baseline normalization
 def run_analysis_baseline(*args, **kwargs):
     """
-    Modified run_analysis function that uses baseline normalization instead of global.
-    This patches the core functions to use baseline normalization.
+    Run analysis using baseline normalization approach.
+    This maintains compatibility with the original run_analysis interface.
     """
     # Import here to avoid circular imports
     from nm_theta_analyzer import run_analysis as original_run_analysis
     
-    # Remove the normalization_method parameter if it exists (original function doesn't accept it)
+    # Remove the normalization_method parameter if it exists
     if 'normalization_method' in kwargs:
         del kwargs['normalization_method']
     
-    # Patch the core functions to use baseline normalization
-    patch_core_functions_for_baseline()
+    # Set the baseline normalization flag (this is the key difference)
+    kwargs['force_baseline_normalization'] = True
     
+    # Call the original run_analysis function with baseline normalization enabled
     try:
-        # Call original function with patched core functions
         return original_run_analysis(*args, **kwargs)
-    finally:
-        # Restore original functions
-        restore_original_functions()
+    except Exception as e:
+        print(f"Error in baseline normalization analysis: {e}")
+        raise
 
 
 def patch_core_functions_for_baseline():
     """
-    Temporarily patch core functions to use baseline normalization.
+    DEPRECATED: This function previously did dangerous runtime patching.
+    Now it's a no-op since we use direct baseline normalization calls.
     """
-    import nm_theta_single_basic
-    import nm_theta_multi_session
-    global _original_extract_nm_event_windows
-    
-    # Store original functions
-    if not hasattr(patch_core_functions_for_baseline, 'original_functions'):
-        patch_core_functions_for_baseline.original_functions = {
-            'compute_global_statistics': getattr(nm_theta_single_basic, 'compute_global_statistics', None),
-            'normalize_windows': getattr(nm_theta_single_basic, 'normalize_windows', None),
-            'extract_nm_event_windows': getattr(nm_theta_single_basic, 'extract_nm_event_windows', None),
-        }
-    
-    # Save the original extract_nm_event_windows for use in the wrapper
-    if _original_extract_nm_event_windows is None:
-        _original_extract_nm_event_windows = patch_core_functions_for_baseline.original_functions['extract_nm_event_windows']
-    
-    # Replace with baseline versions
-    if hasattr(nm_theta_single_basic, 'compute_global_statistics'):
-        nm_theta_single_basic.compute_global_statistics = compute_baseline_statistics_wrapper
-    if hasattr(nm_theta_single_basic, 'normalize_windows'):
-        nm_theta_single_basic.normalize_windows = normalize_windows_baseline_wrapper
-    if hasattr(nm_theta_single_basic, 'extract_nm_event_windows'):
-        nm_theta_single_basic.extract_nm_event_windows = extract_nm_event_windows_baseline_wrapper
+    # This function is now deprecated - no patching needed
+    pass  # No-op to maintain compatibility
 
 
 def restore_original_functions():
     """
-    Restore original functions after baseline analysis.
+    DEPRECATED: This function previously restored patched functions.
+    Now it's a no-op since we use direct baseline normalization calls.
     """
+    # This function is now deprecated - no restoration needed
+    pass  # No-op to maintain compatibility
     import nm_theta_single_basic
     global _original_extract_nm_event_windows
     
@@ -137,48 +128,86 @@ def compute_baseline_statistics_wrapper(power: np.ndarray) -> Tuple[np.ndarray, 
 
 def normalize_windows_baseline_wrapper(nm_windows: Dict, global_mean: np.ndarray, global_std: np.ndarray) -> Dict:
     """
-    Wrapper that uses baseline normalization instead of global normalization.
+    Wrapper that uses proper baseline z-score normalization across events.
+    
+    Instead of computing std within each event's baseline (which includes oscillatory variance),
+    this method:
+    1. Averages each event's baseline period to get single baseline power per frequency
+    2. Computes statistics (mean/std) across all baseline averages  
+    3. Applies z-score normalization using these cross-event statistics
+    
+    This gives meaningful z-scores that reflect power changes relative to 
+    typical baseline levels, not oscillatory variance within baselines.
     """
-    # Convert to the format expected by baseline normalization
     normalized_windows = {}
     
     for nm_size, data in nm_windows.items():
         windows = data['windows']  # (n_events, n_freqs, n_times)
-        window_times = data.get('window_times', np.linspace(-1.0, 1.0, windows.shape[2]))
+        # Get window_times or create with proper duration
+        if 'window_times' in data:
+            window_times = data['window_times']
+        else:
+            # Fallback: assume 2.0s duration based on context (should not happen with proper wrapper)
+            n_times = windows.shape[2]
+            window_times = np.linspace(-1.0, 1.0, n_times)
+            print(f"Warning: Missing window_times for NM size {nm_size}, using fallback")
+        n_events, n_freqs, n_times = windows.shape
         
-        # Apply baseline normalization to each event
-        normalized_events = []
+        # Extract baseline period (-1.0 to -0.5 seconds)
+        baseline_mask = (window_times >= -1.0) & (window_times <= -0.5)
         
-        for event_idx in range(windows.shape[0]):
-            event_window = windows[event_idx]  # (n_freqs, n_times)
-            
-            # Extract baseline period (-1.0 to -0.5 seconds)
-            baseline_mask = (window_times >= -1.0) & (window_times <= -0.5)
-            
-            if np.any(baseline_mask):
-                # Compute baseline statistics for this event
-                baseline_data = event_window[:, baseline_mask]  # (n_freqs, baseline_times)
-                baseline_mean = np.mean(baseline_data, axis=1, keepdims=True)  # (n_freqs, 1)
-                baseline_std = np.std(baseline_data, axis=1, keepdims=True)    # (n_freqs, 1)
-                baseline_std = np.maximum(baseline_std, 1e-12)  # Avoid division by zero
-                
-                # Normalize entire event using baseline statistics
-                normalized_event = (event_window - baseline_mean) / baseline_std
-            else:
-                # Fallback to global normalization if no baseline period found
-                mean_expanded = global_mean[:, np.newaxis]
-                std_expanded = global_std[:, np.newaxis]
+        if not np.any(baseline_mask):
+            # Fallback to global normalization if no baseline period found
+            print(f"Warning: No baseline period found for NM size {nm_size}, using global normalization")
+            mean_expanded = global_mean[:, np.newaxis]
+            std_expanded = global_std[:, np.newaxis]
+            normalized_events = []
+            for event_idx in range(n_events):
+                event_window = windows[event_idx]
                 normalized_event = (event_window - mean_expanded) / std_expanded
+                normalized_events.append(normalized_event)
+        else:
+            # Step 1: Extract baseline averages for all events (removes temporal oscillations)
+            baseline_averages = []  # Will be (n_events, n_freqs)
             
-            normalized_events.append(normalized_event)
+            for event_idx in range(n_events):
+                event_window = windows[event_idx]  # (n_freqs, n_times)
+                baseline_data = event_window[:, baseline_mask]  # (n_freqs, baseline_times)
+                baseline_avg = np.mean(baseline_data, axis=1)  # (n_freqs,) - single value per freq
+                baseline_averages.append(baseline_avg)
+            
+            # Step 2: Compute statistics across events (proper z-score denominator)
+            baseline_averages = np.array(baseline_averages)  # (n_events, n_freqs)
+            baseline_mean_across_events = np.mean(baseline_averages, axis=0)  # (n_freqs,)
+            baseline_std_across_events = np.std(baseline_averages, axis=0)     # (n_freqs,)
+            baseline_std_across_events = np.maximum(baseline_std_across_events, 1e-12)  # Avoid division by zero
+            
+            print(f"NM size {nm_size}: Baseline stats computed across {n_events} events")
+            print(f"  Baseline mean range: {baseline_mean_across_events.min():.3f} - {baseline_mean_across_events.max():.3f}")
+            print(f"  Baseline std range: {baseline_std_across_events.min():.6f} - {baseline_std_across_events.max():.6f}")
+            
+            # Step 3: Apply z-score normalization to each event
+            normalized_events = []
+            mean_expanded = baseline_mean_across_events[:, np.newaxis]  # (n_freqs, 1)
+            std_expanded = baseline_std_across_events[:, np.newaxis]    # (n_freqs, 1)
+            
+            for event_idx in range(n_events):
+                event_window = windows[event_idx]  # (n_freqs, n_times)
+                # Z-score: (event - baseline_mean) / baseline_std_across_events
+                normalized_event = (event_window - mean_expanded) / std_expanded
+                normalized_events.append(normalized_event)
         
         # Convert back to original format
         normalized_windows[nm_size] = {
             **data,  # Copy all original data
             'windows': np.array(normalized_events),  # Replace with normalized windows
-            'normalization_method': 'baseline',
+            'normalization_method': 'baseline_proper_zscore',
             'baseline_window': (-1.0, -0.5)
         }
+        
+        # Report z-score range for verification
+        final_z_scores = np.array(normalized_events)
+        print(f"  Final z-score range: {final_z_scores.min():.2f} to {final_z_scores.max():.2f}")
     
     return normalized_windows
 
@@ -354,18 +383,40 @@ def get_frequencies(freq_min: float, freq_max: float, n_freqs: int = None,
         # Load from file
         all_frequencies = load_frequencies_from_file(freq_file_path)
         
-        # Filter frequencies to be within the specified range
-        mask = (all_frequencies >= freq_min) & (all_frequencies <= freq_max)
-        frequencies = all_frequencies[mask]
+        # Enhanced filtering: include frequencies slightly outside the range for better coverage
+        # Sort all frequencies first
+        all_frequencies = np.sort(all_frequencies)
         
-        if len(frequencies) == 0:
+        # Find frequencies within the specified range
+        main_mask = (all_frequencies >= freq_min) & (all_frequencies <= freq_max)
+        main_frequencies = all_frequencies[main_mask]
+        
+        if len(main_frequencies) == 0:
             raise ValueError(f"No frequencies in range {freq_min}-{freq_max} Hz found in {freq_file_path}")
         
-        # Sort frequencies (typically descending in the file)
-        frequencies = np.sort(frequencies)
+        # Find closest frequencies outside the range for better coverage
+        extended_frequencies = main_frequencies.copy()
         
-        print(f"Loaded {len(frequencies)} frequencies from {freq_file_path}")
-        print(f"Frequency range: {frequencies[0]:.2f}-{frequencies[-1]:.2f} Hz")
+        # Look for frequency just below freq_min
+        below_mask = all_frequencies < freq_min
+        if np.any(below_mask):
+            closest_below_idx = np.where(below_mask)[0][-1]  # Last (highest) frequency below freq_min
+            closest_below = all_frequencies[closest_below_idx]
+            extended_frequencies = np.concatenate([[closest_below], extended_frequencies])
+            print(f"   Including frequency below range: {closest_below:.3f} Hz (extends coverage)")
+        
+        # Look for frequency just above freq_max
+        above_mask = all_frequencies > freq_max
+        if np.any(above_mask):
+            closest_above_idx = np.where(above_mask)[0][0]  # First (lowest) frequency above freq_max
+            closest_above = all_frequencies[closest_above_idx]
+            extended_frequencies = np.concatenate([extended_frequencies, [closest_above]])
+            print(f"   Including frequency above range: {closest_above:.3f} Hz (extends coverage)")
+        
+        frequencies = extended_frequencies
+        
+        print(f"Loaded {len(main_frequencies)} frequencies in range + {len(frequencies) - len(main_frequencies)} edge frequencies from {freq_file_path}")
+        print(f"Effective frequency range: {frequencies[0]:.3f}-{frequencies[-1]:.3f} Hz (requested: {freq_min:.1f}-{freq_max:.1f} Hz)")
         
         return frequencies
     else:
@@ -407,109 +458,37 @@ def load_electrode_mappings(mapping_file: str = None) -> pd.DataFrame:
     return df.set_index('rat_id')
 
 
+# DEPRECATED: This function has been replaced with the fixed version
+# Use get_electrode_numbers_from_roi_fixed from electrode_mapping_fixes.py instead
 def get_electrode_numbers_from_roi(roi_or_channels: Union[str, List[int]], 
                                    mapping_df: pd.DataFrame,
                                    rat_id: str) -> Union[List[int], str]:
     """
-    Convert ROI specification to electrode numbers using the mapping.
-    
-    Parameters:
-    -----------
-    roi_or_channels : Union[str, List[int]]
-        ROI specification ("frontal", "hippocampus") or electrode numbers
-    mapping_df : pd.DataFrame
-        Electrode mappings DataFrame
-    rat_id : str
-        Rat ID for mapping lookup
-        
-    Returns:
-    --------
-    Union[List[int], str]
-        List of electrode numbers, or ROI string if ROI mapping not implemented
+    DEPRECATED: Use get_electrode_numbers_from_roi_fixed instead.
+    This function has known bugs and is kept only for compatibility.
     """
-    if isinstance(roi_or_channels, list):
-        return roi_or_channels
+    print("⚠️  WARNING: Using deprecated get_electrode_numbers_from_roi function")
+    print("   Please use get_electrode_numbers_from_roi_fixed from electrode_mapping_fixes.py")
     
-    if roi_or_channels.replace(',', '').replace(' ', '').isdigit():
-        # It's a comma-separated list of channels
-        return [int(ch.strip()) for ch in roi_or_channels.split(',')]
-    
-    # It's a ROI name - would need additional mapping logic
-    # For now, return the raw specification
-    return roi_or_channels
+    # Call the fixed version
+    return get_electrode_numbers_from_roi_fixed(roi_or_channels, mapping_df, rat_id)
 
 
+# DEPRECATED: This function has been replaced with the fixed version  
+# Use check_rat_9442_compatibility_fixed from electrode_mapping_fixes.py instead
 def check_rat_9442_compatibility(roi_or_channels: Union[str, List[int]], 
                                 mapping_df: pd.DataFrame,
                                 verbose: bool = True) -> bool:
     """
-    Check if the requested ROI/channels are compatible with rat 9442's 20-channel sessions.
-    
-    Parameters:
-    -----------
-    roi_or_channels : Union[str, List[int]]
-        ROI specification or electrode numbers
-    mapping_df : pd.DataFrame
-        Electrode mappings DataFrame
-    verbose : bool
-        Whether to print compatibility info
-        
-    Returns:
-    --------
-    bool
-        True if compatible, False otherwise
+    DEPRECATED: Use check_rat_9442_compatibility_fixed instead.
+    This function has known bugs and is kept only for compatibility.
     """
-    try:
-        # Get electrode numbers for the requested ROI/channels
-        requested_electrodes = get_electrode_numbers_from_roi(roi_or_channels, mapping_df, '9442')
-        
-        # If it's a string ROI that couldn't be converted, assume it's compatible for now
-        if isinstance(requested_electrodes, str):
-            if verbose:
-                print(f"  ROI '{requested_electrodes}' - assuming compatible (ROI mapping not implemented)")
-            return True
-        
-        # Get available electrodes from the CSV mapping for rat 9442
-        # Note: rat_id in CSV is stored as int, not string
-        rat_id_int = 9442
-        if rat_id_int not in mapping_df.index:
-            if verbose:
-                print(f"  ❌ Rat 9442 not found in electrode mappings")
-            return False
-        
-        rat_9442_mapping = mapping_df.loc[rat_id_int]
-        available_electrodes = []
-        
-        for col in rat_9442_mapping.index:
-            if col.startswith('ch_'):
-                electrode_value = rat_9442_mapping[col]
-                if pd.notna(electrode_value) and electrode_value != 'None':
-                    try:
-                        available_electrodes.append(int(electrode_value))
-                    except (ValueError, TypeError):
-                        continue
-        
-        available_electrodes_set = set(available_electrodes)
-        requested_electrodes_set = set(requested_electrodes)
-        
-        if verbose:
-            print(f"  Available electrodes from CSV for rat 9442: {sorted(available_electrodes)}")
-        
-        missing_electrodes = requested_electrodes_set - available_electrodes_set
-        
-        if missing_electrodes:
-            if verbose:
-                print(f"  ❌ Rat 9442 incompatible - electrodes not in CSV mapping: {sorted(missing_electrodes)}")
-            return False
-        else:
-            if verbose:
-                print(f"  ✓ Rat 9442 compatible - all electrodes {sorted(requested_electrodes)} found in CSV mapping")
-            return True
-            
-    except Exception as e:
-        if verbose:
-            print(f"  ⚠️  Error checking rat 9442 compatibility: {e}")
-        return False
+    if verbose:
+        print("⚠️  WARNING: Using deprecated check_rat_9442_compatibility function")
+        print("   Please use check_rat_9442_compatibility_fixed from electrode_mapping_fixes.py")
+    
+    # Call the fixed version
+    return check_rat_9442_compatibility_fixed(roi_or_channels, mapping_df, verbose)
 
 
 def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False, verbose: bool = True, 
@@ -908,6 +887,20 @@ def aggregate_cross_rats_results(
         # Average across rats
         avg_spectrogram = np.mean(spectrograms, axis=0)
         
+        # Optional: Apply mild smoothing to reduce horizontal line artifacts from outlier frequencies
+        # This helps with artifacts while preserving the overall spectral structure
+        from scipy.ndimage import gaussian_filter1d
+        try:
+            # Apply mild smoothing along frequency axis (axis=0) to reduce any remaining artifacts
+            # sigma=0.8 provides gentle smoothing while preserving spectral detail
+            avg_spectrogram = gaussian_filter1d(avg_spectrogram, sigma=0.8, axis=0)
+            if verbose:
+                print(f"  Applied mild frequency smoothing (sigma=0.8) to reduce artifacts")
+        except ImportError:
+            if verbose:
+                print(f"  Scipy not available - skipping artifact smoothing")
+            pass
+        
         final_aggregated_windows[nm_size] = {
             'avg_spectrogram': avg_spectrogram,
             # 'individual_spectrograms': spectrograms,  # Commented out to save memory/storage
@@ -1056,8 +1049,8 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
     
     vmin, vmax = calculate_color_limits(all_spectrograms)
     # Hardcoded color limits for now
-    vmin = -0.42
-    vmax = 0.22
+    #vmin = -0.42
+    #vmax = 0.22
     
     if verbose:
         print(f"📊 Color map limits: [{vmin}, {vmax}] (calculated from data)")
@@ -1076,8 +1069,33 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
         
         # Use log-frequency spacing for y-axis
         log_frequencies = np.log10(frequencies)
+        
+        # Ensure spectrogram dimensions match time vector for pcolormesh
+        expected_samples = len(window_times)
+        actual_samples = avg_spectrogram.shape[1]
+        
+        if verbose and actual_samples != expected_samples:
+            print(f"  Dimension mismatch for NM size {nm_size}: spectrogram has {actual_samples} time points, window_times has {expected_samples}")
+        
+        if actual_samples != expected_samples:
+            if actual_samples > expected_samples:
+                # Trim excess samples from the end symmetrically
+                excess = actual_samples - expected_samples
+                start_trim = excess // 2
+                end_trim = excess - start_trim
+                avg_spectrogram = avg_spectrogram[:, start_trim:actual_samples-end_trim]
+                if verbose:
+                    print(f"    Trimmed {excess} samples symmetrically ({start_trim} from start, {end_trim} from end)")
+            else:
+                # Pad with edge values (better than zeros)
+                padding = expected_samples - actual_samples
+                avg_spectrogram = np.pad(avg_spectrogram, ((0, 0), (0, padding)), mode='edge')
+                if verbose:
+                    print(f"    Padded {padding} samples with edge values")
+        
+        # Use improved shading to reduce artifacts from irregular data
         im = ax.pcolormesh(window_times, log_frequencies, avg_spectrogram,
-                          shading='auto', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
+                          shading='gouraud', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
         ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
         
         # Add baseline window markers
@@ -1162,7 +1180,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
                 # Use log-frequency spacing for y-axis
                 log_frequencies = np.log10(frequencies)
                 im = ax.pcolormesh(window_times, log_frequencies, avg_spectrogram,
-                                  shading='auto', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
+                                  shading='gouraud', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
                 ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
                 
                 # Add baseline window markers
@@ -1593,12 +1611,13 @@ if __name__ == "__main__":
 
         start_time = time.time()
         results = run_cross_rats_analysis(
-            roi="11",                   # Change ROI here
+            roi="6",                   # Change ROI here
             pkl_path=data_path,               # Keep explicit path
-            freq_min=2.0,                     # Test narrow theta range
-            freq_max=10.0,                     # Test narrow theta range
-            n_freqs=50,                       # More frequencies for better resolution
-            window_duration=1.0,              # 1 second window around events
+            freq_min=3.0,                     # Test narrow theta range
+            freq_max=7.0,                     # Test narrow theta range
+            #n_freqs=50,                       # More frequencies for better resolution
+            freq_file_path="data/config/frequencies.txt",
+            window_duration=2.0,              # 1 second window around events
             save_path="results/cross_rats",  # Main results directory
             cleanup_intermediate_files=True,  # Cleanup session folders (saves space)
             verbose=True                      # Detailed output

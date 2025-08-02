@@ -68,8 +68,22 @@ def extract_theta_power(spectrograms: np.ndarray, frequencies: np.ndarray,
     # Extract specific time window if requested
     if time_window is not None and window_times is not None:
         time_mask = (window_times >= time_window[0]) & (window_times <= time_window[1])
+        
+        # Debug: Check dimensions (only show if there's a mismatch)
+        if theta_power_time_series.shape[1] != len(window_times):
+            print(f"Debug: theta_power_time_series shape: {theta_power_time_series.shape}")
+            print(f"Debug: window_times shape: {window_times.shape}")
+            print(f"Debug: time_mask shape: {time_mask.shape}")
+            print(f"Debug: time_mask sum: {np.sum(time_mask)}")
+        
         if np.any(time_mask):
-            theta_power_time_series = theta_power_time_series[:, time_mask]
+            # Ensure dimensions match
+            if theta_power_time_series.shape[1] == len(window_times):
+                theta_power_time_series = theta_power_time_series[:, time_mask]
+            else:
+                print(f"Warning: Dimension mismatch. Using all time points.")
+                print(f"  theta_power_time_series has {theta_power_time_series.shape[1]} time points")
+                print(f"  window_times has {len(window_times)} time points")
     
     # Average across time to get single power value per rat
     theta_power = np.mean(theta_power_time_series, axis=1)  # Shape: (n_rats,)
@@ -77,10 +91,68 @@ def extract_theta_power(spectrograms: np.ndarray, frequencies: np.ndarray,
     return theta_power
 
 
+def load_individual_rat_results(cross_rats_dir: str, verbose: bool = True) -> Dict[str, Dict]:
+    """
+    Load individual rat results from rat_XXX_mne/multi_session_results.pkl files.
+    
+    Parameters:
+    -----------
+    cross_rats_dir : str
+        Directory containing rat_XXX_mne folders
+    verbose : bool
+        Whether to print loading progress
+        
+    Returns:
+    --------
+    rat_results : Dict[str, Dict]
+        Dictionary mapping rat_id -> individual rat results
+    """
+    import glob
+    import pickle
+    
+    rat_results = {}
+    
+    # Find all rat_XXX_mne folders
+    rat_folders = glob.glob(os.path.join(cross_rats_dir, "rat_*_mne"))
+    
+    if verbose:
+        print(f"🔍 Loading individual rat results from {len(rat_folders)} folders...")
+    
+    for rat_folder in rat_folders:
+        # Extract rat ID from folder name (e.g., "rat_442_mne" -> "442")
+        folder_name = os.path.basename(rat_folder)
+        rat_id = folder_name.replace("rat_", "").replace("_mne", "")
+        
+        # Load individual rat results
+        results_file = os.path.join(rat_folder, "multi_session_results.pkl")
+        
+        if os.path.exists(results_file):
+            try:
+                with open(results_file, 'rb') as f:
+                    rat_data = pickle.load(f)
+                rat_results[rat_id] = rat_data
+                
+                if verbose:
+                    n_sessions = rat_data.get('n_sessions_analyzed', 'unknown')
+                    nm_sizes = list(rat_data.get('averaged_windows', {}).keys())
+                    print(f"  ✓ Loaded rat {rat_id}: {n_sessions} sessions, NM sizes {nm_sizes}")
+                    
+            except Exception as e:
+                if verbose:
+                    print(f"  ❌ Failed to load rat {rat_id}: {e}")
+        else:
+            if verbose:
+                print(f"  ⚠️  Results file not found for rat {rat_id}: {results_file}")
+    
+    if verbose:
+        print(f"✓ Successfully loaded {len(rat_results)} individual rat results")
+    
+    return rat_results
+
+
 def create_theta_power_plots(results: Dict, save_path: str, 
                            theta_range: Tuple[float, float] = None,
                            time_window: Optional[Tuple[float, float]] = None,
-                           ylim: Optional[Tuple[float, float]] = None,
                            verbose: bool = True):
     """
     Create theta band power plots with mean ± 1 SE for different NM types.
@@ -95,16 +167,13 @@ def create_theta_power_plots(results: Dict, save_path: str,
         Frequency range for theta band (default: from AnalysisConfig)
     time_window : Optional[Tuple[float, float]]
         Time window to extract power from (default: None for all times)
-    ylim : Optional[Tuple[float, float]], optional
-        Y-axis limits for the plot (default: from PlottingConfig)
+    # ylim automatically calculated from data with 20% margin
     verbose : bool
         Whether to print progress information
     """
     # Apply configuration defaults
     if theta_range is None:
         theta_range = AnalysisConfig.get_theta_range()
-    if ylim is None:
-        ylim = PlottingConfig.get_theta_power_ylim()
     
     if verbose:
         print(f"\n📊 Creating theta power plots (mean ± 1 SE)")
@@ -113,71 +182,189 @@ def create_theta_power_plots(results: Dict, save_path: str,
             print(f"Time window: {time_window[0]}-{time_window[1]} s")
         print("=" * 60)
     
-    frequencies = results['frequencies']
-    averaged_windows = results['averaged_windows']
+    # Load individual rat results for proper statistics
+    # The save_path might be like "results/cross_rats" so we need the actual cross_rats directory
+    if save_path and "cross_rats" in save_path:
+        cross_rats_dir = save_path if save_path.endswith("cross_rats") else os.path.dirname(save_path)
+    else:
+        cross_rats_dir = "results/cross_rats"
     
-    # Extract theta power for each NM type
-    nm_types = []
-    theta_powers = []
+    if verbose:
+        print(f"Looking for individual rat results in: {cross_rats_dir}")
     
-    for nm_size, window_data in averaged_windows.items():
-        nm_types.append(float(nm_size))
+    rat_results = load_individual_rat_results(cross_rats_dir, verbose=verbose)
+    
+    if not rat_results:
+        if verbose:
+            print("❌ No individual rat results found. Falling back to aggregate data without error bars.")
+        # Fall back to aggregate approach
+        frequencies = results['frequencies']
+        averaged_windows = results['averaged_windows']
+        nm_types = []
+        nm_means = []
+        nm_ses = []
+        nm_metadata = []
         
-        # Get individual rat spectrograms
-        individual_spectrograms = window_data['individual_spectrograms']
-        window_times = window_data['window_times']
+        for nm_size, window_data in averaged_windows.items():
+            nm_types.append(float(nm_size))
+            avg_spectrogram = window_data['avg_spectrogram']
+            window_times = window_data['window_times']
+            
+            # Fix dimension mismatch
+            if avg_spectrogram.shape[1] != len(window_times):
+                min_len = min(avg_spectrogram.shape[1], len(window_times))
+                avg_spectrogram = avg_spectrogram[:, :min_len]
+                window_times = window_times[:min_len]
+            
+            aggregate_theta_power = extract_theta_power(
+                spectrograms=avg_spectrogram[np.newaxis, :, :],
+                frequencies=frequencies,
+                theta_range=theta_range,
+                time_window=time_window,
+                window_times=window_times
+            )[0]
+            
+            nm_means.append(aggregate_theta_power)
+            nm_ses.append(0.0)  # No SE for aggregate data
+            nm_metadata.append({'n_rats': window_data['n_rats'], 'total_events': window_data['total_events_all_rats']})
+    else:
+        # Use individual rat data for proper statistics
+        frequencies = results['frequencies']
         
-        # Extract theta power for each rat
-        rat_theta_powers = extract_theta_power(
-            spectrograms=individual_spectrograms,
-            frequencies=frequencies,
-            theta_range=theta_range,
-            time_window=time_window,
-            window_times=window_times
-        )
+        # Get all NM sizes available across rats
+        all_nm_sizes = set()
+        for rat_data in rat_results.values():
+            if 'averaged_windows' in rat_data:
+                # Keys are already floats in individual rat files
+                all_nm_sizes.update(rat_data['averaged_windows'].keys())
         
-        theta_powers.append(rat_theta_powers)
+        all_nm_sizes = sorted(list(all_nm_sizes))
+        
+        nm_types = []
+        nm_means = []
+        nm_ses = []
+        nm_metadata = []
+        
+        for nm_size in all_nm_sizes:
+            nm_types.append(nm_size)
+            
+            # Extract theta power from each rat for this NM size
+            rat_theta_powers = []
+            contributing_rats = []
+            
+            for rat_id, rat_data in rat_results.items():
+                if 'averaged_windows' in rat_data and nm_size in rat_data['averaged_windows']:
+                    window_data = rat_data['averaged_windows'][nm_size]
+                    avg_spectrogram = window_data['avg_spectrogram']
+                    window_times = window_data['window_times']
+                    
+                    # Fix dimension mismatch
+                    if avg_spectrogram.shape[1] != len(window_times):
+                        min_len = min(avg_spectrogram.shape[1], len(window_times))
+                        avg_spectrogram = avg_spectrogram[:, :min_len]
+                        window_times = window_times[:min_len]
+                    
+                    try:
+                        rat_theta_power = extract_theta_power(
+                            spectrograms=avg_spectrogram[np.newaxis, :, :],
+                            frequencies=frequencies,
+                            theta_range=theta_range,
+                            time_window=time_window,
+                            window_times=window_times
+                        )[0]
+                        
+                        rat_theta_powers.append(rat_theta_power)
+                        contributing_rats.append(rat_id)
+                        
+                    except Exception as e:
+                        if verbose:
+                            print(f"  ⚠️  Error extracting theta power for rat {rat_id}, NM size {nm_size}: {e}")
+            
+            if rat_theta_powers:
+                # Calculate mean and standard error across rats
+                mean_power = np.mean(rat_theta_powers)
+                se_power = np.std(rat_theta_powers, ddof=1) / np.sqrt(len(rat_theta_powers))
+                
+                nm_means.append(mean_power)
+                nm_ses.append(se_power)
+                nm_metadata.append({
+                    'n_rats': len(rat_theta_powers),
+                    'contributing_rats': contributing_rats,
+                    'individual_powers': rat_theta_powers
+                })
+                
+                if verbose:
+                    print(f"  ✓ NM size {nm_size}: {len(rat_theta_powers)} rats, mean = {mean_power:.3f} ± {se_power:.3f} SE")
+            else:
+                if verbose:
+                    print(f"  ⚠️  No data found for NM size {nm_size}")
     
-    # Calculate mean and standard error for each NM type
-    nm_means = []
-    nm_ses = []
+    if verbose:
+        print(f"Final theta power values: {[f'{m:.3f}±{s:.3f}' for m, s in zip(nm_means, nm_ses)]}")
     
-    for powers in theta_powers:
-        mean_power = np.mean(powers)
-        se_power = np.std(powers, ddof=1) / np.sqrt(len(powers))  # Standard error
-        nm_means.append(mean_power)
-        nm_ses.append(se_power)
+    # Set fixed y-axis limits from 0 to 1
+    fixed_ylim = (0.0, 1.0)
+    
+    if nm_means:
+        y_min = min(nm_means)
+        y_max = max(nm_means)
+        print(f"Fixed y-limits: {fixed_ylim[0]:.3f} to {fixed_ylim[1]:.3f}")
+        print(f"  Data range: {y_min:.3f} to {y_max:.3f}")
+        if y_max > 1.0:
+            print(f"  ⚠️  Warning: Some data values exceed y-limit (max: {y_max:.3f})")
+        if y_min < 0.0:
+            print(f"  ⚠️  Warning: Some data values below y-limit (min: {y_min:.3f})")
+    else:
+        print(f"Fixed y-limits: {fixed_ylim[0]:.3f} to {fixed_ylim[1]:.3f}")
+        print("  No data available to check range")
     
     # Create the plot
     fig, ax = plt.subplots(figsize=PlottingConfig.get_figure_size('default'))
     
-    # Create bar plot with error bars
-    bars = ax.bar(nm_types, nm_means, yerr=nm_ses, 
-                  capsize=PlottingConfig.BAR_CAPSIZE, 
-                  color=PlottingConfig.BAR_COLOR_DEFAULT, 
-                  alpha=PlottingConfig.BAR_ALPHA, 
-                  edgecolor=PlottingConfig.BAR_EDGE_COLOR)
+    # Create bar plot with error bars if SE is available
+    has_error_bars = any(se > 0 for se in nm_ses)
+    
+    if has_error_bars:
+        bars = ax.bar(nm_types, nm_means, yerr=nm_ses,
+                      capsize=PlottingConfig.BAR_CAPSIZE,
+                      color=PlottingConfig.BAR_COLOR_DEFAULT, 
+                      alpha=PlottingConfig.BAR_ALPHA, 
+                      edgecolor=PlottingConfig.BAR_EDGE_COLOR)
+    else:
+        bars = ax.bar(nm_types, nm_means, 
+                      color=PlottingConfig.BAR_COLOR_DEFAULT, 
+                      alpha=PlottingConfig.BAR_ALPHA, 
+                      edgecolor=PlottingConfig.BAR_EDGE_COLOR)
+    
+    # No separate metadata annotations - keep the plot clean
     
     # Customize the plot
     ax.set_xlabel('Near-Mistake Type', fontsize=PlottingConfig.AXIS_LABEL_FONTSIZE)
     ax.set_ylabel('Theta Power (Z-score)', fontsize=PlottingConfig.AXIS_LABEL_FONTSIZE)
-    ax.set_title(f'Theta Band Power by Near-Mistake Type\n'
-                f'Mean ± 1 SE (n={results["n_rats"]} rats)', 
-                fontsize=PlottingConfig.TITLE_FONTSIZE)
+    if has_error_bars:
+        title_text = f'Theta Band Power by Near-Mistake Type\nMean ± SE across {len(rat_results)} rats'
+    else:
+        title_text = f'Theta Band Power by Near-Mistake Type\nAggregate across {results["n_rats"]} rats (no individual data)'
+    
+    ax.set_title(title_text, fontsize=PlottingConfig.TITLE_FONTSIZE)
     
     # Set x-axis ticks to show NM types
     ax.set_xticks(nm_types)
     ax.set_xticklabels([f'NM {int(nm)}' for nm in nm_types])
     
-    # Set y-axis limits if specified
-    if ylim is not None:
-        ax.set_ylim(ylim)
+    # Set y-axis limits - use fixed 0-1 range
+    ax.set_ylim(fixed_ylim)
     
-    # Add value labels on bars
+    # Add value labels on bars showing mean ± SE
     for bar, mean_val, se_val in zip(bars, nm_means, nm_ses):
         height = bar.get_height()
+        if has_error_bars and se_val > 0:
+            label_text = f'{mean_val:.3f} ± {se_val:.3f}'
+        else:
+            label_text = f'{mean_val:.3f}'
+        
         ax.text(bar.get_x() + bar.get_width()/2., height + se_val + PlottingConfig.VALUE_LABEL_OFFSET,
-                f'{mean_val:.3f}', ha='center', va='bottom', 
+                label_text, ha='center', va='bottom', 
                 fontsize=PlottingConfig.VALUE_LABEL_FONTSIZE)
     
     # Add grid for better readability
@@ -217,12 +404,26 @@ def create_theta_power_plots(results: Dict, save_path: str,
         'nm_types': nm_types,
         'means': nm_means,
         'standard_errors': nm_ses,
-        'individual_powers': [powers.tolist() for powers in theta_powers],
         'theta_range': theta_range,
         'time_window': time_window,
-        'n_rats': results['n_rats'],
-        'roi_specification': results['roi_specification']
+        'n_rats': len(rat_results) if rat_results else results['n_rats'],
+        'roi_specification': results['roi_specification'],
+        'has_individual_data': has_error_bars
     }
+    
+    # Add individual rat data if available
+    if has_error_bars and nm_metadata:
+        theta_results.update({
+            'individual_powers_per_nm': [metadata.get('individual_powers', []) for metadata in nm_metadata],
+            'n_rats_per_nm': [metadata.get('n_rats', 0) for metadata in nm_metadata],
+            'contributing_rats_per_nm': [metadata.get('contributing_rats', []) for metadata in nm_metadata]
+        })
+    else:
+        # Aggregate data fallback
+        theta_results.update({
+            'n_rats_per_nm': [metadata.get('n_rats', 0) for metadata in nm_metadata],
+            'total_events_per_nm': [metadata.get('total_events', 0) for metadata in nm_metadata]
+        })
     
     results_file = os.path.join(save_path, 'theta_power_results.json')
     with open(results_file, 'w') as f:
@@ -309,7 +510,6 @@ def create_theta_power_analysis(results_path: str,
         save_path=save_path,
         theta_range=theta_range,
         time_window=time_window,
-        ylim=ylim,
         verbose=verbose
     )
     
@@ -410,6 +610,7 @@ if __name__ == "__main__":
         
         # Example usage - modify these paths as needed
         results_path = "results/cross_rats/cross_rats_aggregated_results.pkl"
+        #results_path = "D:/nm_theta_results/cross_rats_aggregated_results.pkl"
         
         # Check if example results exist
         if os.path.exists(results_path):
@@ -418,8 +619,8 @@ if __name__ == "__main__":
             # Run theta power analysis
             theta_results = create_theta_power_analysis(
                 results_path=results_path,
-                theta_range=(7.0, 10.0),        # Theta frequency range
-                time_window=(-0.10,0.10),              # Use all time points, or specify (start, end) in seconds
+                theta_range=(3.0, 7.0),        # Theta frequency range
+                time_window=(-0.20,0.00),              # Use all time points, or specify (start, end) in seconds
                 save_path=None,                # Save in same directory as results
                 verbose=True
             )

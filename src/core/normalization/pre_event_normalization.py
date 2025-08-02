@@ -35,7 +35,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import AnalysisConfig, DataConfig, PlottingConfig
 
 # Import baseline normalization functions
-from baseline_normalization import (
+from normalization.baseline_normalization import (
     compute_baseline_statistics, 
     normalize_windows_baseline,
     extract_nm_event_windows_with_baseline,

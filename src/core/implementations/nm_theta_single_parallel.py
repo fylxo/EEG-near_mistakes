@@ -44,14 +44,14 @@ import mne
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import from existing modules
-from nm_theta_single_basic import (
+from implementations.nm_theta_single_basic import (
     extract_nm_event_windows,
     normalize_windows,
     save_roi_results,
     plot_roi_theta_results,
     get_electrode_numbers_from_channels
 )
-from electrode_utils import get_channels, load_electrode_mappings, ROI_MAP
+from utils.electrode_utils import get_channels, load_electrode_mappings, ROI_MAP
 from eeg_analysis_package.time_frequency import morlet_spectrogram
 
 

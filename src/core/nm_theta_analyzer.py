@@ -123,14 +123,14 @@ def parse_roi_specification(roi_str: str) -> Union[str, List[int]]:
 
 def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_id,
                 freq_min, freq_max, n_freqs, window_duration, n_cycles_factor,
-                n_jobs, batch_size, save_path, show_plots, show_frequency_profiles):
+                n_jobs, batch_size, save_path, show_plots, show_frequency_profiles, **kwargs):
     """Run the analysis with the specified parameters."""
     
     roi_specification = parse_roi_specification(roi)
     
     if mode == "single":
         if method == "basic":
-            from nm_theta_single_basic import analyze_session_nm_theta_roi, load_session_data
+            from implementations.nm_theta_single_basic import analyze_session_nm_theta_roi, load_session_data
             
             print("Loading session data...")
             session_data = load_session_data(pkl_path, session_index)
@@ -151,7 +151,7 @@ def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_
             )
             
         elif method == "parallel":
-            from nm_theta_single_parallel import analyze_session_nm_theta_roi_parallel, load_session_data
+            from implementations.nm_theta_single_parallel import analyze_session_nm_theta_roi_parallel, load_session_data
             
             print("Loading session data...")
             session_data = load_session_data(pkl_path, session_index)
@@ -174,7 +174,7 @@ def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_
             )
             
         elif method == "vectorized":
-            from nm_theta_single_vectorized import analyze_session_nm_theta_roi_vectorized, load_session_data
+            from implementations.nm_theta_single_vectorized import analyze_session_nm_theta_roi_vectorized, load_session_data
             
             print("Loading session data...")
             session_data = load_session_data(pkl_path, session_index)
@@ -198,11 +198,14 @@ def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_
             )
             
     elif mode == "multi":
-        from nm_theta_multi_session import analyze_rat_multi_session_memory_efficient
+        from implementations.nm_theta_multi_session import analyze_rat_multi_session_memory_efficient
         
         save_dir = save_path or f'results/multi_session/rat_{rat_id}_memory_efficient'
         
         print("Running multi-session analysis...")
+        # Check if baseline normalization is being forced (by patching system)
+        use_baseline = kwargs.get('force_baseline_normalization', False)
+        
         results = analyze_rat_multi_session_memory_efficient(
             rat_id=rat_id,
             roi_or_channels=roi_specification,
@@ -212,7 +215,8 @@ def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_
             window_duration=window_duration,
             n_cycles_factor=n_cycles_factor,
             save_path=save_dir,
-            show_plots=show_plots
+            show_plots=show_plots,
+            use_baseline_normalization=use_baseline  # Forced by patching system or default False
         )
     
     return results

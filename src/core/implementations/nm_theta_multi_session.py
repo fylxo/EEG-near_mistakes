@@ -27,8 +27,8 @@ import gc
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import from our modules
-from nm_theta_single_basic import analyze_session_nm_theta_roi, load_session_data
-from electrode_utils import get_channels, load_electrode_mappings
+from implementations.nm_theta_single_basic import analyze_session_nm_theta_roi, load_session_data
+from utils.electrode_utils import get_channels, load_electrode_mappings
 
 
 def load_all_sessions_for_rat(pkl_path: str, rat_id: Union[str, int]) -> List[Tuple[int, Dict]]:
@@ -84,7 +84,8 @@ def analyze_rat_multi_session(rat_id: Union[str, int],
                              n_cycles_factor: float = 3.0,
                              save_path: str = None,
                              mapping_df: Optional[pd.DataFrame] = None,
-                             show_plots: bool = True) -> Dict:
+                             show_plots: bool = True,
+                             use_baseline_normalization: bool = False) -> Dict:
     """
     Analyze NM theta oscillations across all sessions for a single rat.
     
@@ -162,7 +163,8 @@ def analyze_rat_multi_session(rat_id: Union[str, int],
                 n_cycles_factor=n_cycles_factor,
                 save_path=session_save_path,
                 mapping_df=mapping_df,
-                show_plots=False  # Don't plot individual sessions
+                show_plots=False,  # Don't plot individual sessions
+                use_baseline_normalization=use_baseline_normalization  # Pass through the parameter
             )
             
             session_results.append(result)
@@ -234,7 +236,8 @@ def analyze_rat_multi_session_memory_efficient(rat_id: Union[str, int],
                                               n_cycles_factor: float = 3.0,
                                               save_path: str = None,
                                               mapping_df: Optional[pd.DataFrame] = None,
-                                              show_plots: bool = True) -> Dict:
+                                              show_plots: bool = True,
+                                              use_baseline_normalization: bool = False) -> Dict:
     """
     Memory-efficient multi-session analysis that processes sessions one by one.
     
@@ -331,7 +334,8 @@ def analyze_rat_multi_session_memory_efficient(rat_id: Union[str, int],
                     n_cycles_factor=n_cycles_factor,
                     save_path=session_save_path,
                     mapping_df=mapping_df,
-                    show_plots=False  # Don't plot individual sessions
+                    show_plots=False,  # Don't plot individual sessions
+                    use_baseline_normalization=use_baseline_normalization  # Pass through the parameter
                 )
                 
                 session_results.append(result)

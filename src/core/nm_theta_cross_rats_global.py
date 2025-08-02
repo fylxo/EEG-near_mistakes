@@ -33,7 +33,7 @@ from config import AnalysisConfig, DataConfig, PlottingConfig
 from nm_theta_analyzer import run_analysis
 
 # Import interactive visualization
-from interactive_spectrogram import add_interactive_to_results
+from utils.interactive_spectrogram import add_interactive_to_results
 
 # Import session resilience system (simplified - now built into nm_theta_multi_session)
 # from session_resilience import SessionProcessor
@@ -890,8 +890,8 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
     
     vmin, vmax = calculate_color_limits(all_spectrograms)
     # Hardcoded color limits for now
-    vmin = -0.42
-    vmax = 0.22
+    #vmin = -0.42
+    #vmax = 0.22
     
     if verbose:
         print(f"📊 Color map limits: [{vmin}, {vmax}] (calculated from data)")
@@ -910,6 +910,21 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
         
         # Use log-frequency spacing for y-axis
         log_frequencies = np.log10(frequencies)
+        
+        # Ensure dimensions match by clipping spectrogram to expected size
+        expected_samples = len(window_times)
+        actual_samples = avg_spectrogram.shape[1]
+        
+        if actual_samples != expected_samples:
+            # Clip spectrogram to expected size (like 200 samples for 1s at 200Hz)
+            if actual_samples > expected_samples:
+                # Trim excess samples from the end
+                avg_spectrogram = avg_spectrogram[:, :expected_samples]
+            else:
+                # Pad with zeros if too few samples (rare case)
+                padding = expected_samples - actual_samples
+                avg_spectrogram = np.pad(avg_spectrogram, ((0, 0), (0, padding)), mode='constant')
+        
         im = ax.pcolormesh(window_times, log_frequencies, avg_spectrogram,
                           shading='auto', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
         ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
@@ -986,6 +1001,21 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
                 
                 # Use log-frequency spacing for y-axis
                 log_frequencies = np.log10(frequencies)
+                
+                # Ensure dimensions match by clipping spectrogram to expected size
+                expected_samples = len(window_times)
+                actual_samples = avg_spectrogram.shape[1]
+                
+                if actual_samples != expected_samples:
+                    # Clip spectrogram to expected size (like 200 samples for 1s at 200Hz)
+                    if actual_samples > expected_samples:
+                        # Trim excess samples from the end
+                        avg_spectrogram = avg_spectrogram[:, :expected_samples]
+                    else:
+                        # Pad with zeros if too few samples (rare case)
+                        padding = expected_samples - actual_samples
+                        avg_spectrogram = np.pad(avg_spectrogram, ((0, 0), (0, padding)), mode='constant')
+                
                 im = ax.pcolormesh(window_times, log_frequencies, avg_spectrogram,
                                   shading='auto', cmap=PARULA_COLORMAP, vmin=vmin, vmax=vmax)
                 ax.axvline(x=0, color='black', linestyle='--', alpha=0.7)
@@ -1623,7 +1653,7 @@ if __name__ == "__main__":
             pkl_path=data_path,               # Keep explicit path
             freq_min=1.0,                     # Override config - test narrow theta
             freq_max=45.0,                     # Override config
-            n_freqs=40,                       # Override config - faster analysis
+            n_freqs=80,                       # Override config - faster analysis
             #freq_file_path="data/config/frequencies_128.txt",  # Use frequencies from file instead of n_freqs
             rat_ids=None,
             window_duration=1.0,              # Override config - longer window

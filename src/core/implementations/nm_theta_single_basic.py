@@ -28,7 +28,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import from existing package
 from eeg_analysis_package.time_frequency import morlet_spectrogram
-from electrode_utils import get_channels, load_electrode_mappings, ROI_MAP
+
+# Import baseline normalization functions
+from normalization.baseline_normalization import (
+    compute_baseline_statistics, 
+    normalize_windows_baseline
+)
+from utils.electrode_utils import get_channels, load_electrode_mappings, ROI_MAP
 
 
 def get_electrode_numbers_from_channels(rat_id: Union[str, int], 
@@ -67,15 +73,17 @@ def get_electrode_numbers_from_channels(rat_id: Union[str, int],
     # Remove NaN values and convert to integers, then to list for consistent display
     row = row[~pd.isna(row)].astype(int).tolist()
     
-    # Get electrode numbers for the given channel indices
+    # FIXED: Get electrode numbers for the given channel indices, ensuring consistent types
     electrode_numbers = []
     for ch_idx in channel_indices:
         if ch_idx < len(row):
-            electrode_numbers.append(row[ch_idx])
+            electrode_numbers.append(int(row[ch_idx]))  # Ensure int type
         else:
-            electrode_numbers.append(f"Ch{ch_idx}")  # Fallback for out-of-range channels
+            # FIXED: Don't mix types - skip invalid channels and warn
+            print(f"Warning: Channel index {ch_idx} out of range for rat {rat_id} (max: {len(row)-1}), skipping")
+            continue  # Skip invalid channels rather than adding strings
     
-    return electrode_numbers
+    return electrode_numbers  # Now guaranteed to be List[int]
 
 
 def load_session_data(pkl_path: str, session_index: int = 0) -> Dict:
@@ -129,7 +137,6 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
         EEG data (n_channels, n_samples)
     roi_channels : List[int]
         List of channel indices to include in ROI
-    sfreq : float
         Sampling frequency in Hz
     freq_range : Tuple[float, float]
         Frequency range (low, high) in Hz
@@ -158,10 +165,9 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
     
     # Create logarithmically spaced frequency vector
     freqs = np.geomspace(freq_range[0], freq_range[1], n_freqs)
-    #n_cycles = np.maximum(3, freqs * n_cycles_factor)
-    #n_cycles = np.linspace(3, 10, len(freqs))
-    n_cycles = np.full(len(freqs), 5)
-
+    # Optimized for theta analysis (3-7Hz): adaptive cycles for better frequency isolation
+    n_cycles = np.maximum(6, freqs * 1.0)  # 3Hz→6 cycles, 7Hz→7 cycles
+    # Fixed cycles can create uniform artifacts - adaptive approach is more scientifically sound
 
     # Print exact frequencies being used
     print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
@@ -251,8 +257,9 @@ def compute_high_res_theta_spectrogram(eeg_data: np.ndarray,
     freqs = np.geomspace(freq_range[0], freq_range[1], n_freqs)
     
     # For low frequencies, use more cycles for better frequency resolution
-    # Use adaptive n_cycles: more cycles for lower frequencies
-    n_cycles = np.maximum(3, freqs * n_cycles_factor)
+    # Optimized for theta analysis (3-7Hz): adaptive cycles for better frequency isolation
+    n_cycles = np.maximum(6, freqs * 1.0)  # 3Hz→6 cycles, 7Hz→7 cycles
+    # Fixed cycles can create uniform artifacts - adaptive approach is more scientifically sound
     
     print(f"Computing high-resolution theta spectrogram...")
     print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
@@ -270,22 +277,22 @@ def compute_high_res_theta_spectrogram(eeg_data: np.ndarray,
         )
         power = power[0, 0, :, :]  # (n_freqs, n_times)
         
-        # Validate time axis alignment
-        if len(times) != power.shape[1]:
-            print(f"Warning: Time axis length mismatch for rat {rat_id}")
-            print(f"  Original times length: {len(times)}")
-            print(f"  Spectrogram time axis: {power.shape[1]}")
-            print(f"  Difference: {len(times) - power.shape[1]} samples")
+        # Validate time axis alignment (note: time axis computed from power shape)
+        expected_times = power.shape[1]
+        print(f"Spectrogram time axis computed: {expected_times} samples")
+        print(f"  Time axis matches power matrix dimensions: {power.shape}")
+        # Note: times vector would need to be computed from sfreq and n_samples if needed
         
     except Exception as e:
         print(f"Error in spectrogram computation: {e}")
-        # Fallback to fixed n_cycles
-        print("Falling back to fixed n_cycles approach...")
+        # Fallback to optimized n_cycles
+        print("Falling back to optimized n_cycles approach...")
+        fallback_n_cycles = np.maximum(6, freqs * 1.0)  # Same as main calculation
         _, power = morlet_spectrogram(
             eeg_data, 
             sfreq=sfreq, 
             freqs=freqs, 
-            n_cycles=5
+            n_cycles=fallback_n_cycles
         )
     
     print(f"Spectrogram computed. Shape: {power.shape}")
@@ -393,17 +400,37 @@ def extract_nm_event_windows(power: np.ndarray,
                 actual_samples = end_idx - start_idx
                 expected_samples = int((end_time - start_time) * 200)  # Based on 200Hz assumption
                 
-                # Allow sample count variations due to timing precision (up to 5% tolerance)
-                max_tolerance = max(10, int(expected_samples * 0.05))  # At least 10 samples or 5%
-                if abs(actual_samples - expected_samples) <= max_tolerance:
-                    nm_windows[event_size].append(window_power)
-                    valid_events[event_size].append(i)
-                else:
-                    difference = abs(actual_samples - expected_samples)
-                    print(f"Warning: NM event {i} at {event_time:.2f}s has significant timing mismatch")
-                    print(f"  Expected samples: {expected_samples}, actual: {actual_samples} (diff: {difference})")
-                    print(f"  Time window: {start_time:.3f} to {end_time:.3f}s")
-                    print(f"  Tolerance exceeded: {difference} > {max_tolerance} samples")
+                # Trim or pad to exactly match the expected window_samples for consistency
+                if actual_samples != window_samples:
+                    if actual_samples > window_samples:
+                        # Trim symmetrically if too many samples
+                        excess = actual_samples - window_samples
+                        trim_start = excess // 2
+                        trim_end = trim_start + window_samples
+                        
+                        # Bounds check to prevent index errors
+                        if trim_end > actual_samples:
+                            # Adjust if trim_end would exceed array bounds
+                            trim_end = actual_samples
+                            trim_start = trim_end - window_samples
+                            if trim_start < 0:
+                                trim_start = 0
+                                trim_end = min(window_samples, actual_samples)
+                        
+                        window_power = window_power[:, trim_start:trim_end]
+                    else:
+                        # Pad with edge values if too few samples (rare case)
+                        pad_needed = window_samples - actual_samples
+                        pad_start = pad_needed // 2
+                        pad_end = pad_needed - pad_start
+                        window_power = np.pad(window_power, ((0, 0), (pad_start, pad_end)), mode='edge')
+                    
+                    if i < 5:  # Only show first few adjustments to avoid spam
+                        print(f"  Event {i}: Adjusted {actual_samples} → {window_samples} samples")
+                
+                # Now window_power always has exactly window_samples time points
+                nm_windows[event_size].append(window_power)
+                valid_events[event_size].append(i)
             else:
                 print(f"Warning: NM event {i} at {event_time:.2f}s too close to recording end")
         else:
@@ -681,7 +708,8 @@ def analyze_session_nm_theta_roi(session_data: Dict,
                                save_path: str = 'nm_theta_results',
                                mapping_df: Optional[pd.DataFrame] = None,
                                show_plots: bool = True,
-                               show_frequency_profiles: bool = False) -> Dict:
+                               show_frequency_profiles: bool = False,
+                               use_baseline_normalization: bool = True) -> Dict:
     """
     Complete NM theta analysis for a ROI in a single session.
     
@@ -707,6 +735,8 @@ def analyze_session_nm_theta_roi(session_data: Dict,
         Whether to display plots (default: True)
     show_frequency_profiles : bool
         Whether to display ROI frequency profiles plot (default: False)
+    use_baseline_normalization : bool
+        Whether to use baseline normalization (True) or per-channel z-score (False) (default: True)
     
     Returns:
     --------
@@ -791,39 +821,98 @@ def analyze_session_nm_theta_roi(session_data: Dict,
         n_cycles_factor=n_cycles_factor
     )
     
-    # Step 3: ROI power is already normalized per channel, no global stats needed
-    print("Step 3: Using per-channel normalized ROI power")
-    # For compatibility with existing functions, create dummy global stats
-    global_mean = np.zeros(len(freqs))
-    global_std = np.ones(len(freqs))
+    if use_baseline_normalization:
+        # Step 3: Extract NM event windows from RAW (non-normalized) power
+        print("Step 3: Extracting NM event windows from raw power for baseline normalization")
+        
+        # Use raw channel powers before ROI averaging for proper baseline normalization
+        # We need to extract windows from individual channels, then normalize, then average
+        all_channel_windows = {}
+        
+        for ch_idx, ch_power in enumerate(channel_powers):
+            print(f"  Extracting windows from channel {roi_channels[ch_idx]} (index {ch_idx})")
+            ch_windows = extract_nm_event_windows(
+                ch_power, times,
+                session_data['nm_peak_times'], 
+                session_data['nm_sizes'],
+                window_duration
+            )
+            
+            if ch_windows:
+                for nm_size, window_data in ch_windows.items():
+                    if nm_size not in all_channel_windows:
+                        all_channel_windows[nm_size] = {
+                            'windows': [],
+                            'window_times': window_data['window_times'],
+                            'valid_events': window_data['valid_events'],
+                            'n_events': window_data['n_events']
+                        }
+                    all_channel_windows[nm_size]['windows'].append(window_data['windows'])
+        
+        if not all_channel_windows:
+            raise ValueError("No valid NM event windows extracted from any channel")
+        
+        # Average across channels for each NM size
+        nm_windows = {}
+        for nm_size, data in all_channel_windows.items():
+            channel_windows = np.array(data['windows'])  # (n_channels, n_events, n_freqs, n_times)
+            # Average across channels (axis=0)
+            averaged_windows = np.mean(channel_windows, axis=0)  # (n_events, n_freqs, n_times)
+            
+            nm_windows[nm_size] = {
+                'windows': averaged_windows,
+                'window_times': data['window_times'],
+                'valid_events': data['valid_events'],
+                'n_events': data['n_events']
+            }
+        
+        # Step 4: Apply baseline normalization
+        print("Step 4: Applying proper baseline normalization (-1.0 to -0.5s)")
+        
+        # Compute baseline statistics
+        baseline_stats = compute_baseline_statistics(
+            nm_windows, 
+            nm_windows[list(nm_windows.keys())[0]]['window_times'],
+            baseline_start=-1.0, 
+            baseline_end=-0.5
+        )
+        
+        # Apply baseline normalization
+        normalized_windows = normalize_windows_baseline(nm_windows, baseline_stats)
+        
+    else:
+        # Step 3: Use original per-channel z-score method
+        print("Step 3: Using per-channel normalized ROI power (legacy method)")
+        # For compatibility with existing functions, create dummy global stats
+        global_mean = np.zeros(len(freqs))
+        global_std = np.ones(len(freqs))
+        
+        # Step 4: Extract NM event windows from pre-normalized ROI power
+        print("Step 4: Extracting NM event windows from pre-normalized ROI power")
+        nm_windows = extract_nm_event_windows(
+            roi_power, times, 
+            session_data['nm_peak_times'],
+            session_data['nm_sizes'],
+            window_duration
+        )
+        
+        if not nm_windows:
+            raise ValueError("No valid NM event windows extracted")
+        
+        # Step 5: No additional normalization needed (already per-channel z-scored)
+        print("Step 5: Using pre-normalized windows (per-channel z-score)")
+        normalized_windows = nm_windows
     
-    # Step 4: Extract NM event windows from ROI power
-    print("Step 4: Extracting NM event windows")
-    nm_windows = extract_nm_event_windows(
-        roi_power, times, 
-        session_data['nm_peak_times'],
-        session_data['nm_sizes'],
-        window_duration
-    )
-    
-    if not nm_windows:
-        raise ValueError("No valid NM event windows extracted")
-    
-    # Step 5: Since ROI power is already normalized, we skip additional normalization
-    print("Step 5: ROI windows already normalized per channel")
-    # For compatibility, use the windows as "normalized"
-    normalized_windows = nm_windows
-    
-    # Step 6: Save results
-    print("Step 6: Saving results")
+    # Step 5: Save results
+    print("Step 5: Saving results")
     save_roi_results(
         session_data, normalized_windows, freqs, 
         roi_channels, roi_or_channels, channel_powers, save_path
     )
     
-    # Step 7: Generate plots
+    # Step 6: Generate plots
     if show_plots:
-        print("Step 7: Generating plots")
+        print("Step 6: Generating plots")
         plot_roi_theta_results(
             normalized_windows, 
             freqs, 

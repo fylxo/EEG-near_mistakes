@@ -85,12 +85,17 @@ def compute_baseline_statistics(nm_windows: Dict,
         # Extract baseline period for all events
         baseline_windows = windows[:, :, baseline_indices]  # (n_events, n_freqs, n_baseline_samples)
         
-        # Compute statistics across baseline time period for each event and frequency
-        baseline_mean = np.mean(baseline_windows, axis=2)  # (n_events, n_freqs)
-        baseline_std = np.std(baseline_windows, axis=2)    # (n_events, n_freqs)
+        # PROPER Z-SCORE METHOD: Average each baseline first, then compute stats across events
+        # Step 1: Average each event's baseline period (removes temporal oscillations)
+        baseline_averages = np.mean(baseline_windows, axis=2)  # (n_events, n_freqs) - single value per event/freq
+        
+        # Step 2: Compute statistics across events (proper z-score denominator)
+        baseline_mean = np.mean(baseline_averages, axis=0)  # (n_freqs,) - mean across events  
+        baseline_std = np.std(baseline_averages, axis=0)    # (n_freqs,) - std across events
         
         # Ensure no zero standard deviations (would cause division by zero)
         baseline_std = np.maximum(baseline_std, 1e-12)
+        
         
         # Store statistics
         baseline_stats[size] = {
@@ -105,6 +110,25 @@ def compute_baseline_statistics(nm_windows: Dict,
         
         print(f"  Baseline mean range: {baseline_mean.min():.2e} - {baseline_mean.max():.2e}")
         print(f"  Baseline std range: {baseline_std.min():.2e} - {baseline_std.max():.2e}")
+        
+        # ADD: Validate minimum events for stable statistics
+        MIN_EVENTS = 3
+        if n_events < MIN_EVENTS:
+            warning_msg = f"NM size {size} has only {n_events} events (< {MIN_EVENTS}). Statistics may be unstable."
+            print(f"⚠️  WARNING: {warning_msg}")
+            print(f"   Consider combining with other NM sizes or excluding from analysis.")
+            
+            # Add warning to the stats dictionary
+            baseline_stats[size]['warnings'] = baseline_stats[size].get('warnings', [])
+            baseline_stats[size]['warnings'].append(warning_msg)
+        
+        # ADD: Additional validation for very small standard deviations
+        if baseline_std.min() < 1e-6:
+            warning_msg = f"NM size {size} has very small baseline variability (min std: {baseline_std.min():.2e}). This may indicate insufficient data variation."
+            print(f"⚠️  WARNING: {warning_msg}")
+            
+            baseline_stats[size]['warnings'] = baseline_stats[size].get('warnings', [])
+            baseline_stats[size]['warnings'].append(warning_msg)
     
     return baseline_stats
 
@@ -140,14 +164,14 @@ def normalize_windows_baseline(nm_windows: Dict,
         if size not in baseline_stats:
             raise ValueError(f"No baseline statistics found for NM size {size}")
         
-        baseline_mean = baseline_stats[size]['baseline_mean']  # (n_events, n_freqs)
-        baseline_std = baseline_stats[size]['baseline_std']    # (n_events, n_freqs)
+        baseline_mean = baseline_stats[size]['baseline_mean']  # (n_freqs,) - cross-event mean
+        baseline_std = baseline_stats[size]['baseline_std']    # (n_freqs,) - cross-event std
         
-        # Expand dimensions to broadcast with windows
-        mean_expanded = baseline_mean[:, :, np.newaxis]  # (n_events, n_freqs, 1)
-        std_expanded = baseline_std[:, :, np.newaxis]    # (n_events, n_freqs, 1)
+        # Expand dimensions to broadcast with windows (n_events, n_freqs, n_times)
+        mean_expanded = baseline_mean[np.newaxis, :, np.newaxis]  # (1, n_freqs, 1)
+        std_expanded = baseline_std[np.newaxis, :, np.newaxis]    # (1, n_freqs, 1)
         
-        # Apply baseline z-score normalization: (x - baseline_mean) / baseline_std
+        # Apply proper z-score normalization: (x - cross_event_baseline_mean) / cross_event_baseline_std
         normalized = (windows - mean_expanded) / std_expanded
         
         normalized_windows[size] = {
@@ -158,7 +182,7 @@ def normalize_windows_baseline(nm_windows: Dict,
             'baseline_stats': baseline_stats[size]  # Include baseline stats for reference
         }
         
-        print(f"NM size {size}: normalized {data['n_events']} windows using baseline stats")
+        print(f"NM size {size}: normalized {data['n_events']} windows using baseline statistics")
         print(f"  Z-score range: {normalized.min():.2f} to {normalized.max():.2f}")
     
     return normalized_windows
@@ -548,9 +572,9 @@ def analyze_session_with_baseline_normalization(session_data: Dict,
     results : Dict
         Complete analysis results with baseline normalization
     """
-    # Import required functions (assuming they exist in the same package)
-    from electrode_utils import get_channels
-    from nm_theta_single_basic import compute_roi_theta_spectrogram, compute_global_statistics
+    # Import required functions locally to avoid circular imports
+    from utils.electrode_utils import get_channels
+    from implementations.nm_theta_single_basic import compute_roi_theta_spectrogram, compute_global_statistics
     
     print("🧠 Starting baseline-normalized NM theta analysis...")
     

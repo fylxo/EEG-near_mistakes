@@ -883,7 +883,7 @@ def analyze_rat_multi_session_vectorized(
     print("=" * 80)
     
     if save_path is None:
-        save_path = f'results/multi_session/rat_{rat_id}_vectorized_{method}'
+        save_path = f'../../results/multi_session/rat_{rat_id}_vectorized_{method}'
     
     # Step 1: Load all data and find sessions for this rat
     print(f"Loading data from {pkl_path}...")
@@ -1141,7 +1141,7 @@ def main():
             session_data = load_session_data(pkl_path, session_index)
             
             # Set save path
-            save_dir = save_path or f'results/single_session/session_{session_index}_vectorized_{method}'
+            save_dir = save_path or f'../../results/single_session/session_{session_index}_vectorized_{method}'
             
             # Run analysis
             results = analyze_session_nm_theta_roi_vectorized(
@@ -1172,7 +1172,7 @@ def main():
             print(f"  Batch size: {channel_batch_size}")
             
             # Set save path
-            save_dir = save_path or f'results/multi_session/rat_{rat_id}_vectorized_{method}'
+            save_dir = save_path or f'../../results/multi_session/rat_{rat_id}_vectorized_{method}'
             
             # Run analysis
             results = analyze_rat_multi_session_vectorized(

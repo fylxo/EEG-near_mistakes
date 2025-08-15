@@ -17,6 +17,20 @@ import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Optional
 import argparse
 
+# Configure UTF-8 encoding for Windows compatibility
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except (AttributeError, OSError):
+        # For older Python versions or when reconfigure fails
+        import io
+        try:
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+        except Exception:
+            pass  # Continue with default encoding if all else fails
+
 # Add parent directory to path for config imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -187,7 +201,9 @@ def create_theta_power_plots(results: Dict, save_path: str,
     if save_path and "cross_rats" in save_path:
         cross_rats_dir = save_path if save_path.endswith("cross_rats") else os.path.dirname(save_path)
     else:
-        cross_rats_dir = "results/cross_rats"
+        # Use project root relative path
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        cross_rats_dir = os.path.join(project_root, "results", "cross_rats")
     
     if verbose:
         print(f"Looking for individual rat results in: {cross_rats_dir}")
@@ -609,7 +625,9 @@ if __name__ == "__main__":
         print("=" * 60)
         
         # Example usage - modify these paths as needed
-        results_path = "results/cross_rats/cross_rats_aggregated_results.pkl"
+        # Use project root relative path
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        results_path = os.path.join(project_root, "results", "cross_rats", "cross_rats_aggregated_results.pkl")
         #results_path = "D:/nm_theta_results/cross_rats_aggregated_results.pkl"
         
         # Check if example results exist

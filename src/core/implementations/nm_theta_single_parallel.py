@@ -816,7 +816,7 @@ def analyze_rat_multi_session_parallel(
     print("=" * 80)
     
     if save_path is None:
-        save_path = f'results/multi_session/rat_{rat_id}_parallel_{parallel_method}'
+        save_path = f'../../results/multi_session/rat_{rat_id}_parallel_{parallel_method}'
     
     # Step 1: Load all data and find sessions for this rat
     print(f"Loading data from {pkl_path}...")
@@ -1219,7 +1219,7 @@ def main():
                 session_data = load_session_data(args.pkl_path, args.session_index)
                 
                 # Set save path
-                save_path = args.save_path or f'results/single_session/session_{args.session_index}_parallel_{args.parallel_method}'
+                save_path = args.save_path or f'../../results/single_session/session_{args.session_index}_parallel_{args.parallel_method}'
                 
                 # Run analysis
                 results = analyze_session_nm_theta_roi_parallel(
@@ -1253,7 +1253,7 @@ def main():
                 print(f"  Channel jobs: {args.channel_n_jobs or 'auto'}")
                 
                 # Set save path
-                save_path = args.save_path or f'results/multi_session/rat_{args.rat_id}_parallel_{args.parallel_method}'
+                save_path = args.save_path or f'../../results/multi_session/rat_{args.rat_id}_parallel_{args.parallel_method}'
                 
                 # Run analysis
                 results = analyze_rat_multi_session_parallel(
@@ -1291,7 +1291,7 @@ def main():
                 session_data = load_session_data(pkl_path, session_index)
                 
                 # Set save path
-                save_dir = save_path or f'results/single_session/session_{session_index}_parallel_{parallel_method}'
+                save_dir = save_path or f'../../results/single_session/session_{session_index}_parallel_{parallel_method}'
                 
                 # Run analysis
                 results = analyze_session_nm_theta_roi_parallel(
@@ -1325,7 +1325,7 @@ def main():
                 print(f"  Channel jobs: {channel_n_jobs or 'auto'}")
                 
                 # Set save path
-                save_dir = save_path or f'results/multi_session/rat_{rat_id}_parallel_{parallel_method}'
+                save_dir = save_path or f'../../results/multi_session/rat_{rat_id}_parallel_{parallel_method}'
                 
                 # Run analysis
                 results = analyze_rat_multi_session_parallel(

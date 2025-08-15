@@ -2,9 +2,15 @@ import h5py
 import numpy as np
 import csv
 
-# File paths
-INPUT_FILE = 'electrodes_placement.mat'
-OUTPUT_FILE = 'consistent_electrode_mappings.csv'
+# File paths - Use project root relative paths
+import os
+import sys
+
+# Get project root directory
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+INPUT_FILE = os.path.join(project_root, 'data', 'config', 'electrodes_placement.mat')
+OUTPUT_FILE = os.path.join(project_root, 'data', 'config', 'consistent_electrode_mappings.csv')
 
 def ascii_to_str(arr):
     """Convert HDF5 ASCII/char/bytes arrays to string."""

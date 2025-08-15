@@ -24,7 +24,7 @@ from scipy import signal
 import mne
 
 # Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # Import from existing package
 from eeg_analysis_package.time_frequency import morlet_spectrogram
@@ -165,9 +165,10 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
     
     # Create logarithmically spaced frequency vector
     freqs = np.geomspace(freq_range[0], freq_range[1], n_freqs)
-    # Optimized for theta analysis (3-7Hz): adaptive cycles for better frequency isolation
-    n_cycles = np.maximum(6, freqs * 1.0)  # 3Hz→6 cycles, 7Hz→7 cycles
-    # Fixed cycles can create uniform artifacts - adaptive approach is more scientifically sound
+    # Optimized for theta analysis (3-7Hz): use centralized cycles configuration
+    from config import AnalysisConfig
+    n_cycles = AnalysisConfig.compute_n_cycles(freqs)
+    # Cycles method controlled via AnalysisConfig.CYCLES_METHOD
 
     # Print exact frequencies being used
     print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
@@ -257,9 +258,10 @@ def compute_high_res_theta_spectrogram(eeg_data: np.ndarray,
     freqs = np.geomspace(freq_range[0], freq_range[1], n_freqs)
     
     # For low frequencies, use more cycles for better frequency resolution
-    # Optimized for theta analysis (3-7Hz): adaptive cycles for better frequency isolation
-    n_cycles = np.maximum(6, freqs * 1.0)  # 3Hz→6 cycles, 7Hz→7 cycles
-    # Fixed cycles can create uniform artifacts - adaptive approach is more scientifically sound
+    # Optimized for theta analysis (3-7Hz): use centralized cycles configuration
+    from config import AnalysisConfig
+    n_cycles = AnalysisConfig.compute_n_cycles(freqs)
+    # Cycles method controlled via AnalysisConfig.CYCLES_METHOD
     
     print(f"Computing high-resolution theta spectrogram...")
     print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
@@ -287,7 +289,7 @@ def compute_high_res_theta_spectrogram(eeg_data: np.ndarray,
         print(f"Error in spectrogram computation: {e}")
         # Fallback to optimized n_cycles
         print("Falling back to optimized n_cycles approach...")
-        fallback_n_cycles = np.maximum(6, freqs * 1.0)  # Same as main calculation
+        fallback_n_cycles = AnalysisConfig.compute_n_cycles(freqs)  # Use centralized config
         _, power = morlet_spectrogram(
             eeg_data, 
             sfreq=sfreq, 
@@ -811,7 +813,7 @@ def analyze_session_nm_theta_roi(session_data: Dict,
     times = session_data['eeg_time'].flatten()
     
     # Step 2: Compute ROI theta spectrogram
-    print(f"Step 2: Computing ROI theta spectrogram ({freq_range[0]}-{freq_range[1]} Hz)")
+    print(f"Step 2: Computing ROI theta spectrogram ({freq_range[0]:.2f}-{freq_range[1]:.2f} Hz)")
     freqs, roi_power, channel_powers = compute_roi_theta_spectrogram(
         session_data['eeg'],
         roi_channels,
@@ -1222,7 +1224,7 @@ def main():
         print(f"- ROI specification: {roi_specification}")
         print(f"- ROI channels: {results['roi_channels']}")
         print(f"- Number of channels: {len(results['roi_channels'])}")
-        print(f"- Frequency range: {freq_range[0]}-{freq_range[1]} Hz")
+        print(f"- Frequency range: {freq_range[0]:.2f}-{freq_range[1]:.2f} Hz")
         print(f"- NM sizes found: {[float(key) for key in results['normalized_windows'].keys()]}")
         print(f"- Total events analyzed: {sum(data['n_events'] for data in results['normalized_windows'].values())}")
         

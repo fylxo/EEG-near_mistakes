@@ -535,7 +535,7 @@ def process_single_rat_multi_session(
     n_freqs: int = 30,
     window_duration: float = 1.0,
     n_cycles_factor: float = 3.0,
-    base_save_path: str = 'results/cross_rats',
+    base_save_path: str = '../../results/cross_rats',
     show_plots: bool = False,
     method: str = 'mne',
     cleanup_intermediate_files: bool = True,
@@ -742,7 +742,7 @@ def aggregate_cross_rats_results(
             print(f"NM size {nm_size}: {spectrograms.shape[0]} rats, "
                   f"spectrogram shape: {spectrograms.shape[1:]}") 
         
-        # Average across rats
+        # Average across rats - Global normalization uses consistent denominators, so simple averaging is fine
         avg_spectrogram = np.mean(spectrograms, axis=0)
         
         final_aggregated_windows[nm_size] = {
@@ -1654,7 +1654,7 @@ if __name__ == "__main__":
             freq_min=1.0,                     # Override config - test narrow theta
             freq_max=45.0,                     # Override config
             n_freqs=80,                       # Override config - faster analysis
-            #freq_file_path="data/config/frequencies_128.txt",  # Use frequencies from file instead of n_freqs
+            #freq_file_path="../../data/config/frequencies_128.txt",  # Use frequencies from file instead of n_freqs
             rat_ids=None,
             window_duration=1.0,              # Override config - longer window
             save_path="D:/nm_theta_results",  # Save to D: 

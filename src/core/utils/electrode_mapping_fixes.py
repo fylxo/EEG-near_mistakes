@@ -407,7 +407,7 @@ def test_all_fixes():
         
     except FileNotFoundError:
         print("❌ ERROR: Electrode mappings CSV file not found")
-        print("Please ensure data/config/consistent_electrode_mappings.csv exists")
+        print("Please ensure data/config/consistent_electrode_mappings.csv exists in project root")
         return {}
     except Exception as e:
         print(f"❌ ERROR: {e}")

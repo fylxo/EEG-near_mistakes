@@ -135,7 +135,7 @@ def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_
             print("Loading session data...")
             session_data = load_session_data(pkl_path, session_index)
             
-            save_dir = save_path or f'results/single_session/session_{session_index}_basic'
+            save_dir = save_path or f'../../results/single_session/session_{session_index}_basic'
             
             print("Running basic analysis...")
             results = analyze_session_nm_theta_roi(
@@ -156,7 +156,7 @@ def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_
             print("Loading session data...")
             session_data = load_session_data(pkl_path, session_index)
             
-            save_dir = save_path or f'results/single_session/session_{session_index}_parallel_{parallel_type}'
+            save_dir = save_path or f'../../results/single_session/session_{session_index}_parallel_{parallel_type}'
             
             print("Running parallel analysis...")
             results = analyze_session_nm_theta_roi_parallel(
@@ -179,7 +179,7 @@ def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_
             print("Loading session data...")
             session_data = load_session_data(pkl_path, session_index)
             
-            save_dir = save_path or f'results/single_session/session_{session_index}_vectorized_cwt'
+            save_dir = save_path or f'../../results/single_session/session_{session_index}_vectorized_cwt'
             
             print("Running vectorized analysis...")
             results = analyze_session_nm_theta_roi_vectorized(
@@ -200,7 +200,7 @@ def run_analysis(mode, method, parallel_type, pkl_path, roi, session_index, rat_
     elif mode == "multi":
         from implementations.nm_theta_multi_session import analyze_rat_multi_session_memory_efficient
         
-        save_dir = save_path or f'results/multi_session/rat_{rat_id}_memory_efficient'
+        save_dir = save_path or f'../../results/multi_session/rat_{rat_id}_memory_efficient'
         
         print("Running multi-session analysis...")
         # Check if baseline normalization is being forced (by patching system)

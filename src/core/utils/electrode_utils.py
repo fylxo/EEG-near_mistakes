@@ -15,16 +15,31 @@ ROI_MAP = {
     'ss': [4, 13, 2, 15, 23, 24, 1, 16, 25, 26],  # Alias for somatomotor (somatosensory)
 }
 
-def load_electrode_mappings(csv_file='data/config/consistent_electrode_mappings.csv'):
+def load_electrode_mappings(csv_file=None):
     """
     Load electrode mappings from CSV file into a pandas DataFrame.
     
     Args:
-        csv_file (str): Path to the CSV file with electrode mappings
+        csv_file (str): Path to the CSV file with electrode mappings. If None, uses DataConfig path.
         
     Returns:
         pd.DataFrame: DataFrame with rat_id as index and electrode mappings as columns
     """
+    if csv_file is None:
+        # Import here to avoid circular imports
+        import sys
+        import os
+        # Add project root to path
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        sys.path.insert(0, os.path.join(project_root, 'src'))
+        
+        try:
+            from config.data_config import DataConfig
+            csv_file = DataConfig.get_data_file_path(DataConfig.ELECTRODE_MAPPINGS_FILE)
+        except ImportError:
+            # Fallback to hardcoded path relative to project root
+            csv_file = os.path.join(project_root, 'data', 'config', 'consistent_electrode_mappings.csv')
+    
     df = pd.read_csv(csv_file, index_col='rat_id')
     return df
 

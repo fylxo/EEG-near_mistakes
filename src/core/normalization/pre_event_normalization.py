@@ -697,7 +697,7 @@ def process_single_rat_multi_session(
     n_freqs: int = 30,
     window_duration: float = 1.0,
     n_cycles_factor: float = 3.0,
-    base_save_path: str = 'results/cross_rats_baseline',
+    base_save_path: str = '../../results/cross_rats_baseline',
     show_plots: bool = False,
     method: str = 'mne',
     cleanup_intermediate_files: bool = True,
@@ -1585,7 +1585,7 @@ if __name__ == "__main__":
             freq_max=10.0,                     # Test narrow theta range
             n_freqs=50,                       # More frequencies for better resolution
             window_duration=1.0,              # 1 second window around events
-            save_path="results/cross_rats_baseline",  # Baseline results directory
+            save_path="../../results/cross_rats_baseline",  # Baseline results directory
             cleanup_intermediate_files=True,  # Cleanup session folders (saves space)
             verbose=True                      # Detailed output
         )

@@ -18,6 +18,20 @@ import os
 import sys
 import pickle
 import json
+
+# Configure UTF-8 encoding for Windows compatibility
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except (AttributeError, OSError):
+        # For older Python versions or when reconfigure fails
+        import io
+        try:
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+        except Exception:
+            pass  # Continue with default encoding if all else fails
 import gc
 import argparse
 import numpy as np
@@ -34,6 +48,27 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import configuration
 from config import AnalysisConfig, DataConfig, PlottingConfig
+
+# ============================================================================
+# CYCLES CONTROL - How to Change n_cycles Behavior
+# ============================================================================
+# To modify n_cycles behavior, edit src/config/analysis_config.py:
+#
+# For FIXED cycles (all frequencies use same n_cycles):
+#   Set: CYCLES_METHOD = 'fixed'
+#        CYCLES_FIXED = 6    # Use 6 cycles for all frequencies
+#
+# For ADAPTIVE cycles (n_cycles = frequency * factor):
+#   Set: CYCLES_METHOD = 'adaptive'
+#        N_CYCLES_FACTOR_DEFAULT = 1.0
+#
+# For HYBRID cycles (adaptive with minimum):
+#   Set: CYCLES_METHOD = 'hybrid'
+#        CYCLES_MIN = 6                 # Minimum cycles
+#        N_CYCLES_FACTOR_DEFAULT = 1.0  # Factor for higher frequencies
+#
+# Current method: Check AnalysisConfig.CYCLES_METHOD
+# ============================================================================
 
 # Import baseline normalization functions
 from normalization.baseline_normalization import (
@@ -56,6 +91,226 @@ from utils.electrode_mapping_fixes import (
 
 # Add global variable to store original extract_nm_event_windows
 _original_extract_nm_event_windows = None
+
+
+def compute_baseline_reliability_weights(rat_results: Dict, nm_size: str, verbose: bool = False) -> Dict:
+    """
+    Compute reliability weights for each rat based on baseline stability.
+    
+    Rats with more stable baselines (lower baseline std) get higher weights in averaging.
+    This prevents artifacts from rats with unstable baseline normalization.
+    
+    Parameters:
+    -----------
+    rat_results : Dict
+        Dictionary of rat_id -> results
+    nm_size : str
+        NM size to analyze
+    verbose : bool
+        Print detailed information
+        
+    Returns:
+    --------
+    weights_info : Dict
+        Contains weights and diagnostic information for each rat
+    """
+    
+    if verbose:
+        print(f"  🔍 DEBUGGING: Computing baseline reliability weights for NM size {nm_size}")
+        print(f"    Total rats in rat_results: {len(rat_results)}")
+    
+    baseline_reliabilities = {}
+    missing_stats_rats = []
+    invalid_stats_rats = []
+    
+    for rat_id, results in rat_results.items():
+        if verbose:
+            print(f"    🐀 Processing rat {rat_id}...")
+            
+        if results is None:
+            if verbose:
+                print(f"      ❌ Results is None")
+            continue
+            
+        if 'averaged_windows' not in results:
+            if verbose:
+                print(f"      ❌ No 'averaged_windows' key")
+                print(f"         Available keys: {list(results.keys())}")
+            continue
+            
+        # Convert nm_size to float for comparison (since keys are stored as floats)
+        try:
+            nm_size_float = float(nm_size)
+            if verbose:
+                print(f"      🔄 Converted nm_size from '{nm_size}' (type: {type(nm_size)}) to {nm_size_float} (type: {type(nm_size_float)})")
+        except (ValueError, TypeError):
+            if verbose:
+                print(f"      ❌ Invalid NM size format: {nm_size}")
+            continue
+            
+        if nm_size_float not in results['averaged_windows']:
+            if verbose:
+                print(f"      ❌ NM size {nm_size_float} not in averaged_windows")
+                print(f"         Available NM sizes: {list(results['averaged_windows'].keys())}")
+            continue
+            
+        # Get baseline statistics for this rat
+        window_data = results['averaged_windows'][nm_size_float]
+        
+        if verbose:
+            print(f"      📊 Window data keys: {list(window_data.keys())}")
+        
+        # Try to get baseline stats from the rat's data
+        baseline_stats = None
+        if 'baseline_stats' in window_data:
+            baseline_stats = window_data['baseline_stats']
+            if verbose:
+                print(f"      ✓ Found baseline_stats")
+                if baseline_stats is not None:
+                    print(f"         baseline_stats keys: {list(baseline_stats.keys()) if isinstance(baseline_stats, dict) else 'not a dict'}")
+        else:
+            if verbose:
+                print(f"      ❌ No 'baseline_stats' key in window_data")
+        
+        if baseline_stats is None:
+            if verbose:
+                print(f"      ❌ Warning: baseline_stats is None for rat {rat_id}")
+            missing_stats_rats.append(rat_id)
+            continue
+            
+        if 'baseline_std' not in baseline_stats:
+            if verbose:
+                print(f"      ❌ No 'baseline_std' in baseline_stats for rat {rat_id}")
+            invalid_stats_rats.append(rat_id)
+            continue
+            
+        baseline_std = baseline_stats['baseline_std']  # Should be (n_freqs,)
+        
+        if verbose:
+            print(f"      📈 baseline_std shape: {baseline_std.shape}")
+            print(f"         baseline_std range: {baseline_std.min():.6f} - {baseline_std.max():.6f}")
+        
+        # Just add this rat to the valid rats list
+        baseline_reliabilities[rat_id] = 1.0
+        
+        if verbose:
+            print(f"      ✅ Rat {rat_id} added to valid rats")
+    
+    if verbose:
+        print(f"    📊 Summary:")
+        print(f"      Rats with valid baseline stats: {len(baseline_reliabilities)}")
+        print(f"      Rats missing baseline stats: {len(missing_stats_rats)} - {missing_stats_rats}")
+        print(f"      Rats with invalid baseline stats: {len(invalid_stats_rats)} - {invalid_stats_rats}")
+    
+    if not baseline_reliabilities:
+        # Fallback to equal weighting if no baseline stats available
+        if verbose:
+            print(f"    ❌ No baseline stats found for ANY rat, using equal weighting")
+        # Convert nm_size to float for key comparison in the list comprehension
+        try:
+            nm_size_float_fallback = float(nm_size)
+        except (ValueError, TypeError):
+            nm_size_float_fallback = nm_size  # Keep original if conversion fails
+            
+        valid_rats = [rid for rid, results in rat_results.items() 
+                     if results is not None and 'averaged_windows' in results and nm_size_float_fallback in results['averaged_windows']]
+        equal_weight = 1.0 / len(valid_rats) if valid_rats else 0.0
+        return {
+            'weights': {rat_id: equal_weight for rat_id in valid_rats},
+            'method': 'equal_weighting',
+            'n_rats': len(valid_rats),
+            'debug_info': {
+                'missing_stats_rats': missing_stats_rats,
+                'invalid_stats_rats': invalid_stats_rats,
+                'reason': 'no_baseline_stats_found'
+            }
+        }
+    
+    # No weighting - just return list of valid rats for simple averaging
+    valid_rats = list(baseline_reliabilities.keys())
+    
+    if verbose:
+        print(f"    ✅ SUCCESS: Using simple unweighted averaging!")
+        print(f"    📊 Valid rats for averaging: {sorted(valid_rats)}")
+    
+    return {
+        'valid_rats': valid_rats,
+        'method': 'unweighted_average',
+        'n_rats': len(valid_rats),
+        'debug_info': {
+            'missing_stats_rats': missing_stats_rats,
+            'invalid_stats_rats': invalid_stats_rats
+        }
+    }
+
+
+def robust_cross_rat_average(spectrograms: np.ndarray, weights: Dict[str, float], 
+                           rat_ids: List[str], verbose: bool = False) -> np.ndarray:
+    """
+    Compute reliability-weighted average across rats.
+    
+    Parameters:
+    -----------
+    spectrograms : np.ndarray
+        Shape (n_rats, n_freqs, n_times)
+    weights : Dict[str, float]
+        Reliability weights for each rat
+    rat_ids : List[str]
+        Rat IDs corresponding to spectrograms
+    verbose : bool
+        Print averaging details
+        
+    Returns:
+    --------
+    weighted_avg : np.ndarray
+        Shape (n_freqs, n_times) - reliability-weighted average
+    """
+    
+    n_rats, n_freqs, n_times = spectrograms.shape
+    
+    # Get weights in the same order as spectrograms
+    weight_array = np.array([weights.get(rat_id, 0.0) for rat_id in rat_ids])
+    
+    if verbose:
+        print(f"    🧮 ROBUST AVERAGING DEBUG:")
+        print(f"       Spectrograms shape: {spectrograms.shape}")
+        print(f"       Rat IDs: {rat_ids}")
+        print(f"       Weights dict: {weights}")
+        print(f"       Weight array: {weight_array}")
+        print(f"       Weight array sum: {np.sum(weight_array):.6f} (should be 1.0)")
+        
+        # Check for any zero weights
+        zero_weights = weight_array == 0.0
+        if np.any(zero_weights):
+            print(f"       ⚠️  WARNING: Found {np.sum(zero_weights)} rats with zero weights!")
+            
+        # Check weight variance
+        weight_variance = np.var(weight_array)
+        print(f"       Weight variance: {weight_variance:.6f} (higher = more difference)")
+    
+    # Expand weights to broadcast with spectrograms
+    # weights should be (n_rats, 1, 1) to broadcast with (n_rats, n_freqs, n_times)
+    weight_expanded = weight_array[:, np.newaxis, np.newaxis]
+    
+    if verbose:
+        print(f"       Weight expanded shape: {weight_expanded.shape}")
+    
+    # Compute weighted average
+    weighted_sum = np.sum(spectrograms * weight_expanded, axis=0)
+    # Note: weights already sum to 1, so no need to divide by sum of weights
+    
+    if verbose:
+        # Verify the weighted sum makes sense
+        simple_average = np.mean(spectrograms, axis=0)
+        max_diff = np.max(np.abs(weighted_sum - simple_average))
+        print(f"       ✅ Weighted average computed")
+        print(f"       📊 Max difference from simple average: {max_diff:.6f}")
+        
+        if max_diff < 1e-12:
+            print(f"       ⚠️  WARNING: Weighted average is nearly identical to simple average!")
+            print(f"          This might indicate weights are too similar or there's an issue.")
+    
+    return weighted_sum
 
 # Create a clean run_analysis function that uses baseline normalization
 def run_analysis_baseline(*args, **kwargs):
@@ -763,7 +1018,7 @@ def process_single_rat_multi_session(
                 freq_max=freq_range[1],
                 n_freqs=n_freqs,
                 window_duration=window_duration,
-                n_cycles_factor=n_cycles_factor,
+                n_cycles_factor=AnalysisConfig.get_n_cycles_factor(),
                 n_jobs=None,
                 batch_size=8,
                 save_path=rat_save_path,
@@ -884,25 +1139,70 @@ def aggregate_cross_rats_results(
             print(f"NM size {nm_size}: {spectrograms.shape[0]} rats, "
                   f"spectrogram shape: {spectrograms.shape[1:]}") 
         
-        # Average across rats
-        avg_spectrogram = np.mean(spectrograms, axis=0)
+        # Apply robust cross-rat averaging with baseline reliability weighting
+        # This fixes artifacts caused by inconsistent baseline normalization across rats
+        if verbose:
+            print(f"🔍 DEBUGGING: About to compute weights for NM size {nm_size}...")
+            
+        weights_info = compute_baseline_reliability_weights(
+            valid_results, str(nm_size), verbose
+        )
         
-        # Optional: Apply mild smoothing to reduce horizontal line artifacts from outlier frequencies
-        # This helps with artifacts while preserving the overall spectral structure
-        from scipy.ndimage import gaussian_filter1d
-        try:
-            # Apply mild smoothing along frequency axis (axis=0) to reduce any remaining artifacts
-            # sigma=0.8 provides gentle smoothing while preserving spectral detail
-            avg_spectrogram = gaussian_filter1d(avg_spectrogram, sigma=0.8, axis=0)
+        if verbose:
+            print(f"⚖️  Weight computation result: method = {weights_info['method']}")
+            
+        if weights_info['method'] == 'reliability_weighted':
+            # Use reliability-weighted averaging
             if verbose:
-                print(f"  Applied mild frequency smoothing (sigma=0.8) to reduce artifacts")
-        except ImportError:
+                print(f"✅ USING RELIABILITY-WEIGHTED AVERAGING!")
+                print(f"   📊 Weights: {weights_info['weights']}")
+                print(f"   🐀 Rat order in spectrograms: {data['rat_ids']}")
+                
+            avg_spectrogram = robust_cross_rat_average(
+                spectrograms, weights_info['weights'], data['rat_ids'], verbose
+            )
             if verbose:
-                print(f"  Scipy not available - skipping artifact smoothing")
-            pass
+                print(f"  ✅ Applied reliability-weighted averaging ({weights_info['n_rats']} rats)")
+                
+                # Compare with simple average for verification
+                simple_avg = np.mean(spectrograms, axis=0)
+                max_diff = np.max(np.abs(avg_spectrogram - simple_avg))
+                print(f"  📈 Max difference from simple average: {max_diff:.6f}")
+                if max_diff < 1e-10:
+                    print(f"  ⚠️  WARNING: Weighted and simple averages are nearly identical!")
+                    print(f"     This suggests weights might be too similar or there's an issue.")
+            
+            # Store results with weighting information
+            averaging_info = {
+                'averaging_method': 'reliability_weighted',
+                'reliability_weights': weights_info['weights'],
+                'reliability_scores': weights_info.get('reliability_scores', {}),
+                'debug_info': weights_info.get('debug_info', {})
+            }
+        else:
+            # Fallback to simple average if no baseline stats available
+            if verbose:
+                print(f"❌ FALLBACK: Using simple averaging")
+                print(f"   Reason: {weights_info.get('debug_info', {}).get('reason', 'unknown')}")
+                if 'debug_info' in weights_info:
+                    debug = weights_info['debug_info']
+                    if debug.get('missing_stats_rats'):
+                        print(f"   Missing stats rats: {debug['missing_stats_rats']}")
+                    if debug.get('invalid_stats_rats'):
+                        print(f"   Invalid stats rats: {debug['invalid_stats_rats']}")
+                        
+            avg_spectrogram = np.mean(spectrograms, axis=0)
+            if verbose:
+                print(f"  Applied simple averaging (no baseline stats available)")
+            
+            averaging_info = {
+                'averaging_method': 'simple_mean',
+                'debug_info': weights_info.get('debug_info', {})
+            }
         
         final_aggregated_windows[nm_size] = {
             'avg_spectrogram': avg_spectrogram,
+            **averaging_info,  # Include averaging method information
             # 'individual_spectrograms': spectrograms,  # Commented out to save memory/storage
             'window_times': first_result['averaged_windows'][nm_size]['window_times'],
             'total_events_per_rat': data['total_events'],
@@ -1140,7 +1440,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
     
     # Add overall title
     roi_str = f"ROI: {results['roi_specification']} (channels: {roi_channels})"
-    freq_str = f"Freq: {results['analysis_parameters']['frequency_range'][0]}-{results['analysis_parameters']['frequency_range'][1]} Hz"
+    freq_str = f"Freq: {results['analysis_parameters']['frequency_range'][0]:.2f}-{results['analysis_parameters']['frequency_range'][1]:.2f} Hz"
     norm_str = "Normalization: Pre-event baseline (-1.0 to -0.5s)"
     
     plt.suptitle(f'Cross-Rats NM Theta Analysis - Pre-Event Normalization\n{roi_str}, {freq_str}\n{norm_str}', fontsize=14)
@@ -1413,7 +1713,7 @@ def run_cross_rats_analysis(
             freq_range=(freq_min_analysis, freq_max_analysis),
             n_freqs=n_freqs_analysis,
             window_duration=window_duration,
-            n_cycles_factor=n_cycles_factor,
+            n_cycles_factor=AnalysisConfig.get_n_cycles_factor(),
             base_save_path=save_path,
             show_plots=show_plots,
             method=method,
@@ -1611,11 +1911,11 @@ if __name__ == "__main__":
 
         start_time = time.time()
         results = run_cross_rats_analysis(
-            roi="6",                   # Change ROI here
+            roi="32",                   # Change ROI here
             pkl_path=data_path,               # Keep explicit path
             freq_min=3.0,                     # Test narrow theta range
             freq_max=7.0,                     # Test narrow theta range
-            #n_freqs=50,                       # More frequencies for better resolution
+            #n_freqs=60,                       # More frequencies for better resolution
             freq_file_path="data/config/frequencies.txt",
             window_duration=2.0,              # 1 second window around events
             save_path="results/cross_rats",  # Main results directory

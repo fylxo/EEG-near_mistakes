@@ -273,7 +273,7 @@ def process_single_rat_3_7hz(
     frequencies: np.ndarray,
     window_duration: float = 2.0,
     n_cycles_factor: float = 3.0,
-    base_save_path: str = 'results/cross_rats_3_7hz',
+    base_save_path: str = '../../results/cross_rats_3_7hz',
     show_plots: bool = False,
     verbose: bool = True
 ) -> Tuple[str, Optional[Dict]]:
@@ -658,9 +658,13 @@ def run_cross_rats_3_7hz_analysis(
     if pkl_path is None:
         pkl_path = DataConfig.get_data_file_path(DataConfig.MAIN_EEG_DATA_FILE)
     if freq_file_path is None:
-        freq_file_path = "data/config/frequencies.txt"
+        # Use project root relative path
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        freq_file_path = os.path.join(project_root, "data", "config", "frequencies.txt")
     if save_path is None:
-        save_path = "results/cross_rats_3_7hz"
+        # Use project root relative path
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        save_path = os.path.join(project_root, "results", "cross_rats_3_7hz")
     
     # Load 3-7Hz frequencies
     frequencies = get_3_7hz_frequencies(freq_file_path)
@@ -753,7 +757,12 @@ def main():
                        help='Path to main EEG data file')
     parser.add_argument('--roi', required=True,
                        help='ROI name or channels')
-    parser.add_argument('--freq_file_path', default="data/config/frequencies.txt",
+    # Use project root relative path for default
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    default_freq_file = os.path.join(project_root, "data", "config", "frequencies.txt")
+    default_save_path = os.path.join(project_root, "results", "cross_rats_3_7hz")
+    
+    parser.add_argument('--freq_file_path', default=default_freq_file,
                        help='Path to frequencies file')
     parser.add_argument('--window_duration', type=float, default=2.0,
                        help='Original event window duration (s)')
@@ -761,7 +770,7 @@ def main():
                        help='Cycles factor for spectrograms')
     parser.add_argument('--rat_ids', type=str, default=None,
                        help='Specific rat IDs to process (comma-separated)')
-    parser.add_argument('--save_path', default="results/cross_rats_3_7hz",
+    parser.add_argument('--save_path', default=default_save_path,
                        help='Directory for saving results')
     parser.add_argument('--show_plots', action='store_true',
                        help='Show plots during processing')
@@ -806,13 +815,18 @@ if __name__ == "__main__":
 
         data_path = DataConfig.get_data_file_path(DataConfig.MAIN_EEG_DATA_FILE)
 
+        # Use project root relative paths
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        freq_file_path = os.path.join(project_root, "data", "config", "frequencies.txt")
+        save_path = os.path.join(project_root, "results", "cross_rats_3_7hz")
+        
         start_time = time.time()
         results = run_cross_rats_3_7hz_analysis(
             roi="6",
             pkl_path=data_path,
-            freq_file_path="data/config/frequencies.txt",
+            freq_file_path=freq_file_path,
             rat_ids=None,
-            save_path="results/cross_rats_3_7hz",
+            save_path=save_path,
             verbose=True
         )
         end_time = time.time()

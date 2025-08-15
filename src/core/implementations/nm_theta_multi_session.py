@@ -85,7 +85,7 @@ def analyze_rat_multi_session(rat_id: Union[str, int],
                              save_path: str = None,
                              mapping_df: Optional[pd.DataFrame] = None,
                              show_plots: bool = True,
-                             use_baseline_normalization: bool = False) -> Dict:
+                             use_baseline_normalization: bool = True) -> Dict:
     """
     Analyze NM theta oscillations across all sessions for a single rat.
     
@@ -237,7 +237,7 @@ def analyze_rat_multi_session_memory_efficient(rat_id: Union[str, int],
                                               save_path: str = None,
                                               mapping_df: Optional[pd.DataFrame] = None,
                                               show_plots: bool = True,
-                                              use_baseline_normalization: bool = False) -> Dict:
+                                              use_baseline_normalization: bool = True) -> Dict:
     """
     Memory-efficient multi-session analysis that processes sessions one by one.
     
@@ -275,7 +275,7 @@ def analyze_rat_multi_session_memory_efficient(rat_id: Union[str, int],
     print("=" * 80)
     
     if save_path is None:
-        save_path = f'results/multi_session/rat_{rat_id}_memory_efficient'
+        save_path = f'../../results/multi_session/rat_{rat_id}_memory_efficient'
     
     # Step 1: Load all data once and find sessions for this rat
     print(f"Loading data from {pkl_path}...")
@@ -451,9 +451,10 @@ def average_session_results(session_results: List[Dict],
     for nm_size in all_nm_sizes:
         print(f"Averaging windows for NM size {nm_size}...")
         
-        # Collect windows from all sessions that have this NM size
+        # Collect windows and baseline stats from all sessions that have this NM size
         size_windows = []
         size_sessions = []
+        size_baseline_stats = []
         total_events = 0
         
         for session_idx, result in enumerate(session_results):
@@ -462,6 +463,17 @@ def average_session_results(session_results: List[Dict],
                 size_windows.append(windows)
                 size_sessions.append(session_idx)
                 total_events += windows.shape[0]
+                
+                # Collect baseline statistics if available
+                session_nm_data = result['normalized_windows'][nm_size]
+                if 'baseline_stats' in session_nm_data and session_nm_data['baseline_stats'] is not None:
+                    baseline_stats = session_nm_data['baseline_stats']
+                    size_baseline_stats.append(baseline_stats)
+                    print(f"    ✓ Found baseline stats for session {session_idx + 1}, NM size {nm_size}")
+                else:
+                    print(f"    Warning: No baseline stats found for session {session_idx + 1}, NM size {nm_size}")
+                    print(f"      Available keys in session NM data: {list(session_nm_data.keys())}")
+                
                 print(f"  Session {session_idx + 1}: {windows.shape[0]} events")
         
         if size_windows:
@@ -512,13 +524,46 @@ def average_session_results(session_results: List[Dict],
             # Get window times from first session (should be consistent)
             window_times = session_results[0]['normalized_windows'][list(session_results[0]['normalized_windows'].keys())[0]]['window_times']
             
+            # Aggregate baseline statistics across sessions
+            aggregated_baseline_stats = None
+            if size_baseline_stats:
+                print(f"  Aggregating baseline statistics from {len(size_baseline_stats)} sessions...")
+                
+                # Collect baseline means and stds from all sessions
+                session_baseline_means = []
+                session_baseline_stds = []
+                
+                for stats in size_baseline_stats:
+                    session_baseline_means.append(stats['baseline_mean'])  # (n_freqs,)
+                    session_baseline_stds.append(stats['baseline_std'])    # (n_freqs,)
+                
+                # Average baseline statistics across sessions
+                # This gives us a single set of baseline stats representing this rat's typical baseline
+                session_baseline_means = np.array(session_baseline_means)  # (n_sessions, n_freqs)
+                session_baseline_stds = np.array(session_baseline_stds)    # (n_sessions, n_freqs)
+                
+                aggregated_baseline_mean = np.mean(session_baseline_means, axis=0)  # (n_freqs,)
+                aggregated_baseline_std = np.mean(session_baseline_stds, axis=0)    # (n_freqs,)
+                
+                aggregated_baseline_stats = {
+                    'baseline_mean': aggregated_baseline_mean,
+                    'baseline_std': aggregated_baseline_std,
+                    'n_sessions_contributing': len(size_baseline_stats),
+                    'baseline_period': size_baseline_stats[0].get('baseline_period', [-1.0, -0.5])
+                }
+                
+                print(f"    Aggregated baseline std range: {aggregated_baseline_std.min():.6f} - {aggregated_baseline_std.max():.6f}")
+            else:
+                print(f"    Warning: No baseline statistics available for aggregation")
+            
             averaged_windows[nm_size] = {
                 'windows': all_windows,
                 'window_times': window_times,
                 'n_events': total_events,
                 'n_sessions': len(size_sessions),
                 'contributing_sessions': size_sessions,
-                'avg_spectrogram': np.mean(all_windows, axis=0)  # Average across all events from all sessions
+                'avg_spectrogram': np.mean(all_windows, axis=0),  # Average across all events from all sessions
+                'baseline_stats': aggregated_baseline_stats  # Include aggregated baseline statistics
             }
             
             print(f"  ✓ NM size {nm_size}: {total_events} total events from {len(size_sessions)} sessions")
@@ -683,7 +728,7 @@ def main():
         
         print(f"Starting multi-session analysis for rat {rat_id}")
         print(f"ROI specification: {roi_specification}")
-        print(f"Frequency range: {freq_range[0]}-{freq_range[1]} Hz")
+        print(f"Frequency range: {freq_range[0]:.2f}-{freq_range[1]:.2f} Hz")
         
         # Run multi-session analysis
         results = analyze_rat_multi_session(

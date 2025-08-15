@@ -42,8 +42,29 @@ class AnalysisConfig:
     WINDOW_DURATION_DEFAULT = 1.0
     WINDOW_DURATION_EXTENDED = 2.0
     
-    # Cycles factor for spectrograms (higher = better frequency resolution)
-    N_CYCLES_FACTOR_DEFAULT = 5.0
+    # =============================================================================
+    # SPECTRAL RESOLUTION SETTINGS (CYCLES)
+    # =============================================================================
+    
+    # Cycles method: 'fixed', 'adaptive', or 'hybrid'
+    CYCLES_METHOD = 'fixed'  # TESTING: Use fixed 5 cycles to check artifacts
+    
+    # Fixed cycles (used when method='fixed')
+    CYCLES_FIXED = 5
+    
+    # Adaptive cycles settings (used when method='adaptive' or 'hybrid')
+    N_CYCLES_FACTOR_DEFAULT = 1.0  # Multiplier: n_cycles = freq * factor
+    CYCLES_MIN = 6                 # Minimum cycles (for hybrid mode)
+    
+    # Legacy parameter (kept for backward compatibility)
+    # Will be removed in future versions - use CYCLES_* settings instead
+    @classmethod
+    def get_n_cycles_factor(cls):
+        """Get n_cycles_factor based on current cycles method."""
+        if cls.CYCLES_METHOD == 'fixed':
+            return 0.1  # Force max(CYCLES_MIN, freq*0.1) = CYCLES_MIN
+        else:
+            return cls.N_CYCLES_FACTOR_DEFAULT
     
     # Time windows for specific analyses (seconds relative to event)
     THETA_POWER_TIME_WINDOW = (-0.2, 0.5)  # Pre to post event
@@ -133,6 +154,33 @@ class AnalysisConfig:
         return cls.THETA_POWER_TIME_WINDOW
     
     @classmethod
+    def compute_n_cycles(cls, frequencies):
+        """
+        Compute n_cycles array based on current cycles method.
+        
+        Parameters:
+        -----------
+        frequencies : array-like
+            Frequencies for which to compute cycles
+            
+        Returns:
+        --------
+        n_cycles : np.ndarray
+            Array of cycles for each frequency
+        """
+        import numpy as np
+        frequencies = np.asarray(frequencies)
+        
+        if cls.CYCLES_METHOD == 'fixed':
+            return np.full_like(frequencies, cls.CYCLES_FIXED, dtype=float)
+        elif cls.CYCLES_METHOD == 'adaptive':
+            return frequencies * cls.N_CYCLES_FACTOR_DEFAULT
+        elif cls.CYCLES_METHOD == 'hybrid':
+            return np.maximum(cls.CYCLES_MIN, frequencies * cls.N_CYCLES_FACTOR_DEFAULT)
+        else:
+            raise ValueError(f"Unknown cycles method: {cls.CYCLES_METHOD}")
+
+    @classmethod
     def get_analysis_summary(cls):
         """Get a summary of current analysis settings."""
         return {
@@ -142,7 +190,11 @@ class AnalysisConfig:
             'sampling_rate_hz': cls.SAMPLING_RATE,
             'n_freqs': cls.N_FREQS_DEFAULT,
             'normalization': cls.NORMALIZATION_METHOD,
-            'spectrogram_method': cls.SPECTROGRAM_METHOD_DEFAULT
+            'spectrogram_method': cls.SPECTROGRAM_METHOD_DEFAULT,
+            'cycles_method': cls.CYCLES_METHOD,
+            'cycles_fixed': cls.CYCLES_FIXED if cls.CYCLES_METHOD == 'fixed' else None,
+            'cycles_min': cls.CYCLES_MIN if cls.CYCLES_METHOD == 'hybrid' else None,
+            'n_cycles_factor': cls.N_CYCLES_FACTOR_DEFAULT if cls.CYCLES_METHOD != 'fixed' else None
         }
     
     @classmethod

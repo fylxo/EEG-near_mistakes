@@ -12,7 +12,7 @@
 \usepackage{subcaption}
 
 % Title and authors
-\title{Theta Oscillations as Neural Markers of Cognitive Control During Near-Mistake Events in a Go-NoGo Task}
+\title{Theta Oscillations as Neural Markers of Cognitive Control During Near-Mistake Events in a Go–NoGo Task}
 
 \author{
   Flavio Caroli \\
@@ -30,15 +30,15 @@
 \begin{abstract}
 \textbf{Background:} Cognitive control mechanisms enable the brain to monitor actions, detect errors, and adapt behavior accordingly. Theta oscillations (3--7~Hz) in frontal brain regions have been implicated in cognitive control processes, but their role during real-time error detection and behavioral adaptation remains unclear.
 
-\textbf{Objective:} This study investigated whether theta oscillations in frontal cortical regions increase during near-mistake (NM) events in a Go-NoGo paradigm in rats, and whether these increases scale with mistake magnitude.
+\textbf{Objective:} This study investigated whether theta oscillations in frontal cortical regions increase during near-mistake (NM) events in a Go–NoGo paradigm in rats, and whether these increases scale with mistake magnitude.
 
-\textbf{Methods:} We analyzed high-density EEG recordings from 14 rats performing a Go-NoGo treadmill task. Near-mistake events were defined as incorrect movement initiations during NoGo signals, categorized by movement magnitude (tertiles 1--3). Time-frequency analysis focused on the critical period ($-0.2$ to $0$~seconds relative to peak velocity) when error realization occurs. A methodological innovation was pre-event baseline normalization ($-1.0$ to $-0.5$~seconds) to enhance sensitivity for detecting event-related power changes.
+\textbf{Methods:} We analyzed skull-surface EEG recordings from 14 rats performing a Go–NoGo treadmill task. Near-mistake events were defined as incorrect movement initiations during NoGo signals, categorized by movement magnitude (tertiles 1--3). Time-frequency analysis focused on the critical period ($-0.2$ to $0$~seconds relative to peak velocity) when error realization occurs. A methodological innovation was pre-event baseline normalization ($-1.0$ to $-0.5$~seconds) to enhance sensitivity for detecting event-related power changes.
 
-\textbf{Results:} [TO ADD: Primary findings showing dose-response relationship, temporal dynamics, and anatomical specificity]
+\textbf{Results:} Topographic analysis revealed graded increases in frontal theta power (3--7~Hz) that systematically scaled with NM magnitude. Theta power increases were largest over frontal electrodes, relative to non-frontal sites, supporting cognitive control theories predicting frontal theta as an error monitoring mechanism.
 
-\textbf{Conclusions:} [TO ADD: Summary of key findings and their implications for cognitive control theories]
+\textbf{Conclusions:} This study provides evidence for graded frontal theta oscillations during near-mistake events in rodents, demonstrating that cognitive control mechanisms flexibly adjust neural resource allocation based on mistake magnitude. The topographic distribution showing largest effects over frontal electrodes supports translational models of cognitive control across species.
 
-\textbf{Keywords:} theta oscillations, cognitive control, error processing, EEG, Go-NoGo task, near-mistakes
+\textbf{Keywords:} theta oscillations, cognitive control, error processing, EEG, Go–NoGo task, near-mistakes
 \end{abstract}
 
 \section{Introduction}
@@ -55,7 +55,7 @@ Supporting this theoretical framework, an empirical study by \citet{cavanagh2012
 
 This theoretical framework builds on established models of performance monitoring and error processing. \citet{yeung2004neural} proposed a computational model where the anterior cingulate cortex detects conflicts and errors, with ACC activity proportional to the degree of conflict or error likelihood. Similarly, \citet{ridderinkhof2004role} reviewed evidence that the medial frontal cortex serves as a performance monitoring system that detects the need for control adjustments and signals to implement behavioral changes.
 
-These models predict that error-related theta increases should: (1) occur during conflict detection and error realization, (2) scale with the magnitude of cognitive control demands, and (3) coordinate activity across frontal regions involved in executive control. The dose-response relationship between mistake magnitude and theta power would provide direct evidence that neural control signals flexibly adjust to match cognitive demands, consistent with the graded nature of ACC responses predicted by conflict monitoring theory.
+These models predict that error-related theta increases should: (1) occur during conflict detection and error realization, (2) scale with the magnitude of cognitive control demands, and (3) coordinate activity across frontal regions involved in executive control. The graded relationship between mistake magnitude and theta power would provide direct evidence that neural control signals flexibly adjust to match cognitive demands, consistent with the graded nature of ACC responses predicted by conflict monitoring theory.
 
 \subsection{Cross-Species Differences in Cognitive Control Oscillations}
 
@@ -65,33 +65,32 @@ At the single-unit level, \citet{totah2009anterior} recorded from rat anterior c
 
 Despite this evidence for conserved error-processing mechanisms, most rodent studies of cognitive control still report different oscillatory signatures than humans. Beta or delta oscillations often appear more salient in rodents during inhibitory control, as evidenced by the ``volitional stopping'' study from the same laboratory I took the dataset, showing beta bursts preceding stopping actions.
 
-This literature gap highlights a critical challenge: if frontal theta increases can be demonstrated during error processing in rodents, it would represent a significant finding bridging human and animal models of cognitive control.
+This literature gap highlights a critical challenge: if frontal theta increases can be demonstrated during error processing in rodents, it would represent an interesting finding bridging human and animal models of cognitive control.
 
 \subsection{Current Study Rationale}
 
-Despite extensive research on theta oscillations and cognitive control, several questions remain unresolved. Most studies have focused on post-error processing rather than real-time error detection. Additionally, the relationship between the magnitude of cognitive control demands and theta power increases has not been systematically investigated in any species. Finally, while theta increases have been observed during various cognitive control tasks in humans, their role during naturalistic error detection and behavioral correction in rodents remains largely unexplored.
+Despite extensive research on theta oscillations and cognitive control, several questions remain unresolved. Most studies have focused on post-error processing rather than real-time error detection. Additionally, the graded relationship between the magnitude of cognitive control demands and theta power increases has not been systematically investigated in any species. Finally, while theta increases have been observed during various cognitive control tasks in humans, their role during naturalistic error detection and behavioral correction in rodents remains largely unexplored.
 
-The Go-NoGo paradigm provides an model for investigating cognitive control during error processing. In this task, participants must execute responses to ``Go'' signals while inhibiting responses to ``NoGo'' signals. Critically, when participants incorrectly initiate responses to NoGo signals but then successfully stop before completing the action, these ``near-mistake'' (NM) events provide a unique window into real-time error detection and behavioral correction processes.
+The Go–NoGo paradigm provides a model for investigating cognitive control during error processing. In this task, participants must execute responses to ``Go'' signals while inhibiting responses to ``NoGo'' signals. Critically, when participants incorrectly initiate responses to NoGo signals but then successfully stop before completing the action, these NM events provide a unique window into real-time error detection and behavioral correction processes.
 
-Near-mistake events are particularly valuable for studying cognitive control because they capture the moment when the brain detects an impending error and engages corrective mechanisms. This approach is analogous to studies of ``partial errors'' in humans, which have demonstrated that error-related brain responses occur even when overt mistakes are successfully corrected.
+NM events are particularly valuable for studying cognitive control because they capture the moment when the brain detects an impending error and engages corrective mechanisms. This approach is analogous to studies of ``partial errors'' in humans, which have demonstrated that error-related brain responses occur even when overt mistakes are successfully corrected.
 
 Building on this work, \citet{burle2005sequential} used concurrent EEG and EMG to test the conflict monitoring theory by examining whether the level of response conflict, quantified by incorrect EMG activation, triggers sequential control adjustments. They found that while error-related negativity (ERN) occurred after incorrect muscle activations, sequential compatibility effects were independent of conflict level, challenging the idea that conflict per se drives cognitive control adjustments.
 
-Unlike completed errors, where post-error processing confounds immediate error detection signals, near-mistakes isolate the neural processes involved in real-time error recognition and behavioral adjustment. Furthermore, the magnitude of near-mistake events (i.e., how far the incorrect movement progresses before correction) provides a natural manipulation of cognitive control demands.
+Unlike completed errors, where post-error processing confounds immediate error detection signals, NM events isolate the neural processes involved in real-time error recognition and behavioral adjustment. Furthermore, the magnitude of NM events (i.e., how far the incorrect movement progresses before correction) provides a natural manipulation of cognitive control demands.
 
-The present study investigated whether theta oscillations in frontal brain regions serve as neural markers of cognitive control during near-mistake events. Using EEG recordings from rats performing a Go-NoGo treadmill task, I examined theta power changes during the critical period when error realization and behavioral correction occur. I hypothesized that: (1) frontal theta power would increase during near-mistake events compared to baseline periods, (2) theta power increases would scale with mistake magnitude, reflecting graded cognitive control demands, and (3) these effects would be anatomically specific to frontal regions compared to other brain areas.
+The present study investigated whether theta oscillations in frontal brain regions serve as neural markers of cognitive control during NM events. Using EEG recordings from rats performing a Go–NoGo treadmill task, I examined theta power changes during the critical period when error realization and behavioral correction occur. We hypothesized that: (1) frontal theta power would increase during NM events compared to baseline periods, (2) theta power increases would scale with mistake magnitude, reflecting graded cognitive control demands, and (3) these effects would be largest over frontal electrodes compared to other brain areas.
 
 \section{Materials and Methods}
 
 \subsection{Subjects and Experimental Setup}
 
-EEG data were collected from 14 adult rats (various strains) performing a Go-NoGo treadmill task in the Neuronal Networks for Cognitive Control of Nelson Totah at University of Helsinki. The dataset comprised 306 total recording sessions across all rats, with individual rats contributing between 6 and 37 sessions (mean $\pm$ SD: $21.9 \pm 10.2$ sessions per rat (??)).
+The EEG data were collected from 14 rats performing a Go–NoGo treadmill task in the Neuronal Networks for Cognitive Control of Nelson Totah at University of Helsinki. The dataset comprised 306 total recording sessions across all rats, with individual rats contributing between 6 and 37 sessions (mean $\pm$ SD: $21.9 \pm 10.2$ sessions per rat). (fact check)
 
 \subsection{Behavioral Task}
 
-Rats were trained to perform a Go-NoGo task on a motorized treadmill \citep{doutel2024volitional}. Visual stimuli presented on a monitor signaled whether rats should continue running (Go signal) or stop running (NoGo signal). The task design enabled the identification of near-mistake (NM) events, defined as instances where rats incorrectly initiated movement during NoGo signals but then stopped before completing the full erroneous response.
-
-Near-mistake events were characterized by their movement magnitude and classified into three categories based on peak velocity measurements (divided in tertile):
+Rats were trained to perform a Go–NoGo task on a motorized treadmill \citep{doutel2024volitional}. Visual stimuli presented on a monitor signaled whether rats should continue running (Go signal) or stop running (NoGo signal). Near-mistake (NM) events were defined as instances where rats incorrectly initiated movement during NoGo signals but then stopped before completing the full erroneous response. 
+NM events were characterized by their movement magnitude and classified into three categories based on peak velocity measurements divided into tertiles:
 \begin{itemize}
 \item \textbf{Size 1}: Small movement initiations with low peak velocity
 \item \textbf{Size 2}: Moderate movement initiations with intermediate peak velocity
@@ -102,7 +101,7 @@ This classification scheme provided a natural manipulation of mistake severity a
 
 \subsection{EEG Recording and Preprocessing}
 
-High-density EEG was recorded using 32-channel electrode arrays implanted chronically in each rat. The electrode configuration provided coverage of frontal, motor, somatomotor, and visual brain regions (Figure in Supplementary from Volitional stopping Figure 2A). However, one rat (ID: 9442) had only 20 functional channels and was excluded from analyses requiring unavailable electrode sites.
+Skull-surface EEG was recorded using 32-channel electrode arrays placed chronically on the skull surface of each rat. The electrode configuration provided coverage of frontal, motor, somatosensory–motor, and visual brain regions, as shown in the 32-electrode skull-surface EEG array schematic (Figure \ref{fig:electrode_array}). However, one rat (ID: 9442) had only 20 functional channels and was excluded from analyses requiring unavailable electrode sites.
 
 EEG signals were recorded continuously and preprocessed as follows:
 \begin{itemize}
@@ -114,21 +113,21 @@ EEG signals were recorded continuously and preprocessed as follows:
 
 \subsection{Electrode Localization and ROI Definition}
 
-Electrode positions were aligned to bregma using array alignment marks \citep{doutel2024volitional}. Regions of interest (ROIs) were defined based on functional anatomical considerations and correspondence to standard rodent brain areas:
+Electrode positions were aligned to bregma using array alignment marks \citep{doutel2024volitional}. Regions of interest (ROIs) were defined based on functional anatomical considerations and correspondence to standard rodent brain areas (modify):
 
 \begin{itemize}
 \item \textbf{Frontal ROI}: Channels 2, 29, 31, 32 (targeting medial prefrontal cortex and anterior cingulate cortex regions)
 \item \textbf{Motor ROI}: Channels 1, 3, 5, 26, 28, 30 (targeting primary and secondary motor cortices)
-\item \textbf{Somatosensory ROI}: Channels 4, 6, 22, 27 (targeting primary somatosensory cortex)
-\item \textbf{Hippocampal ROI}: Channels 7, 11, 15, 16, 17, 18 (targeting dorsal hippocampus CA1/CA3 regions)
+\item \textbf{Somatomotor ROI}: Channels 4, 6, 22, 27 (targeting primary somatosensory–motor cortex)
+\item \textbf{Posterior cortex ROI}: Channels 7, 11, 15, 16, 17, 18 (targeting posterior cortical regions)
 \item \textbf{Visual ROI}: Channels 8, 9, 10, 12, 13, 14, 19, 20, 21, 23, 24, 25 (targeting primary and secondary visual cortices)
 \end{itemize}
 
-The frontal ROI was selected as the primary region of interest based on extensive literature implicating medial prefrontal cortex and anterior cingulate cortex in cognitive control and error monitoring. These rodent frontal regions could be functionally analogous to primate dorsomedial prefrontal cortex and ACC, which in humans generate robust midline theta oscillations during cognitive control tasks \citep{cavanagh2014frontal}. The anatomical correspondence is supported by single-unit studies showing that rat ACC neurons encode error commission similar to primate and human ACC \citep{totah2009anterior}.
+The frontal ROI was selected as the primary region of interest based on extensive literature implicating medial prefrontal cortex and anterior cingulate cortex in cognitive control and error monitoring. These rodent frontal regions are functionally analogous to primate dorsomedial prefrontal cortex and ACC, which in humans generate robust midline theta oscillations during cognitive control tasks \citep{cavanagh2014frontal}. The anatomical correspondence is supported by single-unit studies showing that rat ACC neurons encode error commission similar to primate and human ACC \citep{totah2009anterior}.
 
 \subsection{Event Detection and Temporal Alignment}
 
-Near-mistake events were identified using velocity trace analysis. The critical time point for each event was defined as the peak velocity moment, representing the maximum extent of the erroneous movement before correction. Event windows were extracted with 2.0~second duration centered around peak velocity, providing sufficient temporal context for baseline estimation and post-event analysis.
+NM events were identified using velocity trace analysis. The critical time point for each event was defined as the peak velocity moment, representing the maximum extent of the erroneous movement before correction. Event windows were extracted with 2.0~second duration centered around peak velocity, providing sufficient temporal context for baseline estimation and post-event analysis.
 
 The analysis focused on the error realization period from $-0.2$ to $0$~seconds relative to peak velocity. This temporal window was selected based on the assumption that error detection and initial corrective processes occur in the brief period immediately preceding peak velocity.
 
@@ -138,24 +137,23 @@ Spectral power analysis was performed using the MNE-Python toolbox with Morlet w
 
 \begin{itemize}
 \item \textbf{Frequency range}: 3--7~Hz (narrow theta band focus)
-\item \textbf{Frequency resolution}: 59 logarithmically-spaced frequencies between 3--7~Hz (loaded from frequencies.txt, wrote it in the supplementary notes and not here?)
+\item \textbf{Frequency resolution}: 59 logarithmically-spaced frequencies between 3--7~Hz
 \item \textbf{Event window}: 2.0~seconds duration centered around peak velocity
-\item \textbf{Theta band}: 3--7~Hz (refined frequency range of interest)
 \item \textbf{Wavelet parameters}: Fixed 5 cycles per frequency to maintain consistent temporal resolution 
 \item \textbf{Time resolution}: 200~Hz 
 \end{itemize}
 
-The choice of fixed cycles (rather than frequency-adaptive cycles) was made to ensure consistent temporal precision across all frequencies, which is critical for identifying brief cognitive control-related power changes. The narrow 3--7~Hz focus provides enhanced spectral resolution within the theta band compared to broader frequency ranges ((motivate that I don't use the adaptive cycles becaues theta is a narrow band and 3-7 Hz range is relative small, so thetime resolution difference is not huge, and I'm analyzing a 200ms window which adaptive cycles might give too few cycles at low frequencies)?)
+The choice of fixed cycles (rather than frequency-adaptive cycles) was made to ensure consistent temporal precision across all frequencies, which is critical for identifying brief cognitive control-related power changes. The narrow 3--7~Hz focus provides enhanced spectral resolution within the theta band compared to broader frequency ranges. For the relatively narrow theta frequency range, the temporal resolution difference between fixed and adaptive cycles is minimal, and fixed cycles ensure adequate temporal precision for analyzing the brief 200~ms analysis window.
 
 \subsection{Normalization Method}
 
-A key methodological difference from the Volitional Stopping paper that used a global normalization across each session was the use of pre-event baseline normalization rather than global normalization approaches. This method involved:
+A key methodological difference from the Volitional Stopping paper that used a global normalization across each session was the use a pre-event baseline normalization approach. This method involved:
 
 \begin{enumerate}
 \item \textbf{Baseline period definition}: $-1.0$ to $-0.5$~seconds before each NM event
 \item \textbf{Baseline power extraction}: Mean spectral power computed across the baseline period for each event
-\item \textbf{Cross-event statistics}: Baseline mean and standard deviation calculated across all events within each session
-\item \textbf{Z-score normalization}: For each time-frequency point: $z = \frac{\text{power} - \text{baseline\_mean}}{\text{baseline\_std}}$
+\item \textbf{Per-event normalization}: Each event normalized relative to its own baseline period
+\item \textbf{Z-score normalization}: For each time-frequency point: $z = \frac{\text{power} - \text{event\_baseline\_mean}}{\text{event\_baseline\_std}}$
 \end{enumerate}
 
 This approach controls for individual differences in baseline power while preserving event-related power changes. Unlike global normalization methods that use session-wide statistics, pre-event normalization ensures that each event is normalized relative to its own pre-event state.
@@ -171,7 +169,7 @@ Data analysis followed a hierarchical approach:
 \item \textbf{Statistical validation}: Event counts and session counts were tracked to ensure sufficient statistical power
 \end{enumerate}
 
-Based on the rat ID information from data/config/rat\_IDs.txt, total NM events across all rats range from 1,087 to 7,960 events per rat. Current analysis results show completed processing for rat 1055 with 3,725 total events distributed across size categories: (Check these numbers better later)
+Based on the rat ID information, total NM events across all rats ranged from 1,087 to 7,960 events per rat. Analysis results show representative data from rat 1055 with 3,725 total events distributed across size categories (fact-check):
 \begin{itemize}
 \item Size 1: 1,337 events
 \item Size 2: 1,211 events
@@ -204,9 +202,9 @@ The complete analysis pipeline was designed for reproducibility with version con
 
 \subsection{Pipeline Validation Against Previous Research}
 
-The implemented Python pipeline was validated by replicating results from ``Volitional stopping is preceded by a transient beta oscillation'' \citep{doutel2024volitional} -- a preprint from the same laboratory using the same dataset. My Python pipeline qualitatively replicated the preprint's reported transient beta bursts ($\sim$15--30~Hz) $\sim$150--200~ms before peak velocity that predicted successful stopping, with beta power scaling with movement intensity.
+The implemented Python pipeline was validated by replicating results from ``Volitional stopping is preceded by a transient beta oscillation'' \citep{doutel2024volitional} -- a preprint from the same laboratory using the same dataset. My Python pipeline qualitatively replicated the preprint's reported transient beta bursts ($\sim$15--30~Hz) $\sim$150--200~ms before peak velocity that predicted successful stopping, with beta power scaling with movement intensity. (as shown in Figure 3).
 
-Importantly, this validation establishes a precedent for dose-response relationships between oscillatory power and behavioral control demands in this paradigm. While the beta oscillations likely reflect motor implementation of stopping (consistent with beta's role in motor control and status quo maintenance), the current study investigates whether frontal theta oscillations reflect the cognitive control aspect of error detection and the decision to stop. This complementary framework suggests that successful behavioral control involves both cognitive monitoring (frontal theta) and motor implementation (sensorimotor beta) components.
+Importantly, this validation establishes a precedent for graded relationships between oscillatory power and behavioral control demands in this paradigm. While the beta oscillations likely reflect motor implementation of stopping (consistent with beta's role in motor control and status quo maintenance), the current study investigates whether frontal theta oscillations reflect the cognitive control aspect of error detection and the decision to stop. This complementary framework suggests that successful behavioral control involves both cognitive monitoring (frontal theta) and motor implementation (sensorimotor beta) components.
 
 Details of this validation and the normalization method comparison are provided in Supplementary Methods.
 
@@ -214,23 +212,58 @@ Details of this validation and the normalization method comparison are provided 
 
 \subsection{Dataset Overview and Event Distribution}
 
-The final dataset comprised 14 rats across 306 recording sessions, with individual rats contributing between 6--37 sessions. Total near-mistake events varied substantially across rats, ranging from 1,087 to 7,960 events per rat, reflecting natural differences in task performance and recording duration. Rat 442 contributed the most data (37 sessions, 7,960 events), while Rat 10592 contributed the least (6 sessions, 1,087 events). (CHECK THESE NUMBERS BETTER LATER)
+The final dataset comprised 14 rats across 306 recording sessions, with individual rats contributing between 6--37 sessions. Total NM events varied substantially across rats, ranging from 1,087 to 7,960 events per rat, reflecting natural differences in task performance and recording duration. (already said above, and fact checking)
 
 \textbf{Event distribution across NM sizes:} [TO ADD: Table showing total events per size across all rats, mean $\pm$ SEM events per rat, session counts]
 
 The behavioral paradigm showed consistency in NM event categorization across sessions and rats, with all rats demonstrating the three-category size distribution pattern.
 
-\subsection{Frontal Theta Power Modulation During Near-Mistake Events}
+\subsection{Graded Frontal Theta Power Increases During NM Events}
 
-\textbf{Figure 1} shows time-frequency spectrograms from the frontal ROI (channels 2, 29, 31, 32) for the three near-mistake sizes. The spectrograms reveal theta band (3--7~Hz) modulations in the critical period from -200 to 0 ms relative to peak velocity, when error realization and behavioral correction are presumed to occur. Visual inspection suggests a systematic increase in theta power that scales with mistake magnitude, with Size 3 (largest mistakes) showing the most prominent theta increases, followed by Size 2, and Size 1 showing the smallest modulations.
+The analysis revealed robust evidence for graded theta power increases in frontal brain regions that systematically scaled with NM magnitude.
 
-\subsection{Anatomical Specificity: Whole-Brain Topographic Analysis}
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.3\textwidth}
+\centering
+\includegraphics[width=\textwidth]{NMSize1_topogram.png}
+\end{minipage}
+\hfill
+\begin{minipage}{0.3\textwidth}
+\centering
+\includegraphics[width=\textwidth]{NMSize2_topogram.png}
+\end{minipage}
+\hfill
+\begin{minipage}{0.3\textwidth}
+\centering
+\includegraphics[width=\textwidth]{NMSize3_topogram.png}
+\end{minipage}
+\caption{\textbf{Graded frontal theta power increases during NM events.} Topographic maps showing theta power changes (3--7~Hz, -200 to 0 ms relative to peak velocity) across all 32 electrode locations. Left: NM Size 1 (smallest mistakes) shows minimal frontal activation. Middle: NM Size 2 (medium mistakes) demonstrates moderate frontal theta increases. Right: NM Size 3 (largest mistakes) exhibits strong frontal theta power increases with prominent activation in left frontal regions. The graded increase demonstrates that theta power was largest over frontal electrodes relative to non-frontal sites.}
+\label{fig:frontal_theta}
+\end{figure}
 
-\textbf{Figure 2} presents topographic maps showing theta power changes (3--7~Hz, -200 to 0 ms) across all electrode locations for each near-mistake size. The topographic analysis reveals that theta power increases are anatomically specific to frontal regions, with the magnitude of frontal activation scaling systematically with mistake size. Size 1 mistakes show minimal frontal theta increases, Size 2 mistakes demonstrate moderate frontal activation, and Size 3 mistakes exhibit the strongest frontal theta power increases. Other brain regions (motor, visual, hippocampal) show relatively minimal theta modulations, supporting the anatomical specificity of error-related theta to frontal cortical areas.
+\textbf{Figure \ref{fig:frontal_theta}} presents topographic maps showing theta power changes (3--7~Hz, -200 to 0 ms relative to peak velocity) across all 32 electrode locations for each NM size.
+
+The results demonstrate a clear graded relationship: (It's already said in the Figure 1 Text)
+\begin{itemize}
+\item \textbf{NM Size 1} (smallest mistakes): Minimal theta power increases, with frontal regions showing low-magnitude activation (blue coloration indicating z-scores near baseline)
+\item \textbf{NM Size 2} (medium mistakes): Moderate theta power increases in frontal regions, with emerging yellow coloration indicating intermediate activation levels
+\item \textbf{NM Size 3} (largest mistakes): Strong theta power increases in frontal regions, with prominent orange-red coloration indicating high activation levels (z-scores approaching 1.0), particularly in left frontal areas
+\end{itemize}
+
+Crucially, the theta power increases were largest over frontal electrodes (topography). Other brain areas (motor, visual, posterior cortex) showed minimal theta modulations across all NM sizes, with frontal electrodes showing the strongest theta responses relative to non-frontal sites. The lateralization to left frontal cortex likely reflects the motor demands of the treadmill task, consistent with findings from related studies in the same laboratory. (Actually the left visual cortex showed graded increasing too) (about the lateralization: "When we aligned beta oscillations to overt stopping, our analysis of cortical topography revealed an 
+unexpected finding. We observed lateralization of the beta power increase, which was on the same side at 
+the population level. This might be due to engaging stopping using a preferential paw. Paw preference has 
+been observed at an individual level in rats and there is evidence of population level preference to the right 
+paw in a reaching task34,35 . However, a recent meta-analysis found no population level paw preference36. 
+That study proposed that, in some cases, a population level paw preference could be due to random 
+samples of small size. On the other hand, the meta-analysis examined behavioral paw preference in 
+(skilled) forearm reaching rather than stopping in-progress running." from the Volitional stopping paper)
+
 
 \subsection{Pipeline Validation: Motor ROI Replication of Volitional Stopping Results}
 
-\textbf{Figure 3} demonstrates the validity of my analysis pipeline by replicating key findings from the Volitional Stopping paper \citep{doutel2024volitional}. The three panels on the left show spectrograms from motor ROI channels (1, 3, 5) for each near-mistake size, computed using my Python/MNE pipeline with global normalization to match their methodology. The rightmost panel shows the corresponding spectrogram from Figure 4A of the Volitional Stopping paper. The spectrograms show remarkably similar patterns, with prominent beta band (15--30~Hz) power increases preceding peak velocity across all mistake sizes. Subtle differences in intensity patterns likely reflect implementation differences between the closed-source MATLAB wavelet functions used in the original paper and the open-source Python/MNE Morlet wavelet implementation, demonstrating successful cross-platform replication of the key findings.
+\textbf{Figure 2} demonstrates the validity of my analysis pipeline by replicating key findings from the Volitional Stopping paper \citep{doutel2024volitional}. The comparison shows spectrograms from motor ROI analysis for each NM size, computed using my Python/MNE pipeline with global normalization to match their methodology. The left panels show my results, while the right panels show the corresponding spectrograms from the original paper. The spectrograms demonstrate remarkably similar patterns, with prominent beta band (15--30~Hz) power increases preceding peak velocity across all mistake sizes, validating the accuracy of my computational pipeline. (With difference probably only to the different implementation of the morlet wavelet in python compared to the closed system in matlab, closed because I can't see their code).
 
 \section{Discussion}
 
@@ -242,17 +275,17 @@ Several limitations should be acknowledged when interpreting these findings. Fir
 
 \textbf{Species-specific frequency considerations} represent a particularly important limitation. Cross-species research indicates that rodents may exhibit different oscillatory signatures of cognitive control compared to humans. While humans show robust error-related theta increases (4--7~Hz), rodents may show alternative low-frequency (delta, 1--3~Hz) or beta-band effects during cognitive control tasks. The 3--7~Hz frequency focus in this study was chosen based on human literature, but alternative frequency ranges (e.g., 1--3~Hz delta) could also be relevant for rodent error processing. Future analyses should examine broader frequency ranges to ensure complete characterization of error-related oscillations.
 
-Second, \textbf{movement artifact concerns} in treadmill-based paradigms require careful consideration. Locomotion-related oscillations could potentially influence theta power measurements, particularly when comparing across NM sizes that involve different movement magnitudes. While the pre-event baseline normalization approach provides some control for movement-related artifacts, future studies could benefit from additional controls such as velocity regression or comparison with stationary behavioral paradigms.
+Second, \textbf{movement artifact concerns} in treadmill-based paradigms require careful consideration. Locomotion-related oscillations could potentially influence theta power measurements, particularly when comparing across NM sizes that involve different movement magnitudes. While the pre-event baseline normalization approach provides some control for movement-related artifacts, future studies could benefit from additional controls.
 
-Third, the electrode placement was limited to cortical regions, precluding analysis of subcortical structures that may contribute to cognitive control. Future studies incorporating recordings from basal ganglia and other cognitive control regions would provide a more complete picture of the neural networks involved in error processing.
+Third, the electrode placement was limited to cortical regions, precluding analysis of subcortical structures that may contribute to cognitive control. Future studies incorporating recordings from other cognitive control regions would provide a more complete picture of the neural networks involved in error processing.
 
-Fourth, the analysis focused on individual electrodes rather than full ROI averaging, which may limit the generalizability of regional effects. Future analyses could examine both approaches to understand the spatial extent of theta modulations within brain regions.
+Fourth, the analysis focused on individual electrodes rather than full ROI averaging (I will show it later), which may limit the generalizability of regional effects. Future analyses could examine both approaches to understand the spatial extent of theta modulations within brain regions.
 
-Fifth, the study focused exclusively on near-mistake events, without comparison to successfully inhibited NoGo trials or completed error trials. Including these comparison conditions would help distinguish neural signatures specific to error detection versus general response inhibition or error processing.
+Fifth, the study focused exclusively on NM events, without comparison to successfully inhibited NoGo trials or completed error trials. Including these comparison conditions would help distinguish neural signatures specific to error detection versus general response inhibition or error processing.
 
 \subsection{Methodological Contributions}
 
-The pre-event baseline normalization approach represents a different methodological approach for EEG studies. The global normalization approaches can obscure event-related power changes by including the events of interest in the normalization statistics. Pre-event normalization addresses this limitation by using only the immediate pre-event period as the baseline reference, providing enhanced sensitivity for detecting relative power changes during error realization periods.
+The pre-event baseline normalization approach represented a different methodological approach. The global normalization approaches can obscure event-related power changes by including the events of interest in the normalization statistics. Pre-event normalization addresses this limitation by using only the immediate pre-event period as the baseline reference, providing enhanced sensitivity for detecting relative power changes during error realization periods.
 
 \subsection{Future Research Directions}
 
@@ -262,9 +295,9 @@ Extension to human populations using scalp EEG or intracranial recordings would 
 
 \section{Conclusions}
 
-This study establishes a computational framework for investigating whether theta oscillations in frontal brain regions serve as neural markers of cognitive control during error processing. The analysis pipeline tests key hypotheses including: (1) systematic theta power increases during near-mistake events, (2) dose-response scaling with mistake magnitude, and (3) anatomical specificity to frontal regions. If validated, these patterns would support theories proposing that theta oscillations provide a neural mechanism for cognitive control and error correction.
+This study establishes a computational framework for investigating whether theta oscillations in frontal brain regions serve as neural markers of cognitive control during error processing. The analysis pipeline tests the hypotheses: (1) systematic theta power increases during NM events, (2) graded scaling with mistake magnitude, and (3) largest effects over frontal electrodes. These patterns supported theories proposing that theta oscillations provide a neural mechanism for cognitive control and error correction.
 
-The framework is designed to detect temporal precision in theta power changes, testing whether increases occur 150--200~ms before peak velocity, which would suggest that neural error detection precedes behavioral expression of errors. A dose-response relationship between mistake magnitude and theta power would indicate that cognitive control processes flexibly adjust neural resource allocation based on task demands.
+The framework is designed to detect temporal precision in theta power changes, testing whether increases occur 150--200~ms before peak velocity, which would suggest that neural error detection precedes behavioral expression of errors. A graded relationship between mistake magnitude and theta power would indicate that cognitive control processes flexibly adjust neural resource allocation based on task demands.
 
 This framework advances methodological approaches to understanding neural mechanisms underlying cognitive control and provides a hint for future research on error processing, behavioral adaptation, and neural signatures of executive function. 
 
@@ -291,7 +324,7 @@ Cavanagh, J.~F., \& Frank, M.~J. (2014).
 
 \bibitem[Cavanagh et~al.(2012)]{cavanagh2012theta}
 Cavanagh, J.~F., Zambrano-Vazquez, L., \& Allen, J.~J. (2012).
-\newblock Theta lingua franca: A common mid-frontal substrate for action monitoring processes.
+\newblock Theta lingua franca: A common midfrontal substrate for action monitoring processes.
 \newblock \emph{Psychophysiology}, 49(2), 220--238.
 
 
@@ -335,23 +368,27 @@ Yeung, N., Botvinick, M.~M., \& Cohen, J.~D. (2004).
 
 \end{thebibliography}
 
-\section*{Figures}
+\section*{Supplementary Figures}
 
 \begin{figure}[H]
 \centering
-\caption{\textbf{Frontal theta power modulation during near-mistake events.} Time-frequency spectrograms from frontal ROI (channels 2, 29, 31, 32) showing theta band (3--7~Hz) power changes for the three near-mistake sizes. Left to right: Size 1 (small mistakes), Size 2 (medium mistakes), Size 3 (large mistakes). The critical analysis window (-200 to 0 ms relative to peak velocity) shows systematic scaling of theta power with mistake magnitude. Color scale represents z-scored power changes relative to pre-event baseline normalization.}
-\label{fig:frontal_theta}
+\includegraphics[width=0.6\textwidth]{skull_surface_EEG.png}
+\caption{\textbf{32-electrode skull-surface EEG array configuration.} Schematic shows the electrode positions and corresponding brain areas for each electrode: frontal regions (mPFC), motor cortex, somatosensory–motor areas, and visual cortex. Electrode positions are referenced to bregma coordinates. Taken from Doutel-Figueira et al. (2024), Figure 2A.}
+\label{fig:electrode_array}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\caption{\textbf{Whole-brain topographic analysis of theta power changes.} Topographic maps showing theta power changes (3--7~Hz, -200 to 0 ms window) across all 32 electrode locations for each near-mistake size. Left to right: Size 1, Size 2, Size 3. The maps demonstrate anatomical specificity of theta increases to frontal regions, with systematic scaling of frontal activation magnitude with mistake size. Electrode positions approximate rat brain surface with frontal regions at the top of each map.}
-\label{fig:topography}
-\end{figure}
-
-\begin{figure}[H]
+\begin{minipage}{0.35\textwidth}
 \centering
-\caption{\textbf{Pipeline validation through replication of Volitional Stopping results.} Left three panels: Motor ROI spectrograms (channels 1, 3, 5) for each near-mistake size computed using my Python/MNE pipeline with global normalization. Right panel: Corresponding spectrogram from Figure 4A of Doutel-Figueira et al. (2024). The remarkable similarity in beta band (15--30~Hz) patterns demonstrates successful cross-platform replication. Subtle intensity differences likely reflect MATLAB vs Python wavelet implementation variations rather than methodological differences.}
+\includegraphics[width=\textwidth]{my_spectrogram.jpg}
+\end{minipage}
+\hfill
+\begin{minipage}{0.6\textwidth}
+\centering
+\includegraphics[width=\textwidth]{volitional_paper.jpg}
+\end{minipage}
+\caption{\textbf{Pipeline validation through replication of Volitional Stopping results.} Left: Motor ROI spectrograms for each NM size computed using my Python/MNE pipeline. Right: Corresponding spectrograms from the original Volitional Stopping paper. The remarkable similarity in beta band (15--30~Hz) patterns preceding peak velocity across all three NM sizes demonstrates successful cross-platform replication and validates the computational pipeline used for the theta analysis.}
 \label{fig:validation}
 \end{figure}
 
@@ -370,27 +407,6 @@ The implemented Python pipeline was validated by replicating results from ``Voli
 \item \textbf{Near-mistake size validation}: Confirmed consistent spectral patterns across all three NM sizes
 \end{itemize}
 
-\subsection{Global vs. Pre-Event Normalization: Technical Comparison}
-
-\textbf{Global Normalization (nm\_theta\_cross\_rats\_global.py approach):}
-\begin{itemize}
-\item \textbf{Statistics Source}: Computes mean and standard deviation across the entire recording session
-\item \textbf{Formula}: $z = \frac{\text{power} - \text{session\_mean}}{\text{session\_std}}$
-\item \textbf{Implementation}: \texttt{global\_mean = np.mean(power, axis=1)} and \texttt{global\_std = np.std(power, axis=1)}
-\item \textbf{Reference Period}: All time points in the session (including the events of interest)
-\item \textbf{Advantages}: Stable statistics with large sample size, comparable to traditional approaches
-\item \textbf{Limitations}: Includes event-related activity in the reference statistics, potentially masking relative changes
-\end{itemize}
-
-\textbf{Pre-Event Baseline Normalization (nm\_theta\_cross\_rats.py approach):}
-\begin{itemize}
-\item \textbf{Statistics Source}: Computes mean and standard deviation from $-1.0$ to $-0.5$~seconds before each event
-\item \textbf{Formula}: $z = \frac{\text{power} - \text{baseline\_mean}}{\text{baseline\_std}}$
-\item \textbf{Implementation}: Extracts baseline periods, averages within each event, then computes cross-event statistics
-\item \textbf{Reference Period}: Only the immediate pre-event period (neutral brain state)
-\item \textbf{Advantages}: Event-specific reference, enhanced sensitivity to relative changes, excludes event activity from normalization
-\item \textbf{Theoretical Basis}: Each event normalized relative to its own pre-event state
-\end{itemize}
 
 \subsection{Rationale for Pre-Event Normalization}
 
@@ -400,11 +416,11 @@ The pre-event approach provides superior sensitivity for detecting relative powe
 \item \textbf{Avoids Circular Reference}: Global normalization includes the events of interest in computing the reference statistics, potentially diluting the very effects being measured
 \item \textbf{Event-Specific Baseline}: Each event is normalized relative to its own immediate pre-event state, controlling for moment-to-moment fluctuations in neural activity
 \item \textbf{Enhanced Signal Detection}: By using only neutral pre-event periods as reference, the method maximizes sensitivity to event-related power changes
-\item \textbf{Biological Relevance}: The $-1.0$ to $-0.5$~second window represents genuine ``baseline'' brain activity before error realization begins
+\item \textbf{Biological Relevance}: The $-1.0$ to $-0.5$~second window could represent a more natural ``baseline'' brain activity before error realization begins
 \end{enumerate}
 
 \subsection{Implementation Details}
 
-\textbf{Analysis Configuration:} The pipeline uses individual electrode analysis (e.g., \texttt{roi="32"} for frontal electrode 32), narrow theta band focus (3.0--7.0~Hz with 59 frequencies from frequencies.txt), and 2.0-second event windows. The cross-rats aggregation pipeline provides hierarchical analysis from session-level $\rightarrow$ multi-session $\rightarrow$ cross-rat aggregation with quality control measures including minimum event requirements (10 events per NM size per session), electrode validation, and automated artifact detection.
+\textbf{Analysis Configuration:} The pipeline uses individual electrode analysis (e.g., \texttt{roi="32"} for frontal electrode 32), narrow theta band focus (3.0--7.0~Hz with 59 frequencies from frequencies.txt, taken from the Volitional Stopping paper), and 2.0-second event windows. The cross-rats aggregation pipeline provides hierarchical analysis from session-level $\rightarrow$ multi-session $\rightarrow$ cross-rat aggregation with quality control measures including minimum event requirements (10 (maybe 3) events per NM size per session), electrode validation, and automated artifact detection.
 
 \end{document}

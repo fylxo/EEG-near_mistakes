@@ -1,6 +1,6 @@
 # EEG Near-Mistake Analysis Pipeline
 
-A comprehensive Python pipeline for analyzing theta oscillations during near-mistake events in EEG data. This repository contains the complete analysis framework used in the research investigating frontal theta power as a neural marker of cognitive control during error detection.
+A comprehensive Python pipeline for analyzing theta oscillations during near-mistake events in EEG data. This repository contains the complete analysis framework used in the research investigating frontal theta power as a neural marker of cognitive control during error detection. Worked at the Nelson Totah's Neuronal Networks for Cognitive Control lab at University of Helsinki from May 2025 to August 2025.
 
 ## Overview
 

@@ -9,7 +9,7 @@ session and then averages the results across sessions.
 Usage:
     python nm_theta_multi_session.py
 
-Author: Generated for EEG near-mistake multi-session analysis
+Multi-session implementation for EEG near-mistake theta analysis
 """
 
 import numpy as np
@@ -320,7 +320,7 @@ def analyze_rat_multi_session_memory_efficient(rat_id: Union[str, int],
                 # Clean memory before each attempt (especially important for retries)
                 if attempt > 0:
                     gc.collect()
-                    print(f"  🔄 Retry {attempt} for session {orig_session_idx}")
+                    print(f"  Parallel processing Retry {attempt} for session {orig_session_idx}")
                 
                 # Run ROI analysis for this session
                 session_save_path = os.path.join(save_path, f'session_{orig_session_idx}')
@@ -372,7 +372,7 @@ def analyze_rat_multi_session_memory_efficient(rat_id: Union[str, int],
             print(f"❌ Session {orig_session_idx} permanently failed - continuing with remaining sessions")
     
     # Report session processing results
-    print(f"\n📊 Session processing summary:")
+    print(f"\nProcessing Session processing summary:")
     print(f"  Total sessions: {len(session_indices)}")
     print(f"  Successful: {len(session_results)}")
     print(f"  Failed: {len(failed_sessions)}")

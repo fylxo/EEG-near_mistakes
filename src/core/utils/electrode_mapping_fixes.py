@@ -10,7 +10,7 @@ in nm_theta_cross_rats.py. These fixes address:
 3. Incomplete ROI resolution
 4. Incorrect DataFrame column access
 
-Author: Generated for EEG analysis pipeline bug fixes
+Electrode mapping utilities with bug fixes for EEG analysis pipeline
 """
 
 from typing import Union, List, Dict, Optional
@@ -230,7 +230,7 @@ def validate_electrode_mappings(mapping_df: pd.DataFrame, verbose: bool = True) 
     
     for test_name, test_roi in test_cases:
         if verbose:
-            print(f"\n📊 Testing: {test_name} = {test_roi}")
+            print(f"\nProcessing Testing: {test_name} = {test_roi}")
         
         try:
             # Test ROI resolution

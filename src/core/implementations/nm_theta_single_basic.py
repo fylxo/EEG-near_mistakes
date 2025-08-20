@@ -9,7 +9,7 @@ performs z-score normalization, and generates visualization plots.
 Usage:
     python nm_theta_analysis.py
 
-Author: Generated for EEG near-mistake analysis
+Basic implementation for single-session EEG near-mistake theta analysis
 """
 
 import numpy as np
@@ -158,7 +158,7 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
     print(f"ROI channels: {roi_channels}")
     
     # Additional verification for the channels being processed
-    print(f"📊 PROCESSING VERIFICATION:")
+    print("Processing verification:")
     print(f"   Using {len(roi_channels)} channels: {sorted(roi_channels)}")
     print(f"   EEG data shape: {eeg_data.shape}")
     print(f"   Each channel will be z-score normalized individually, then averaged")
@@ -171,7 +171,7 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
     # Cycles method controlled via AnalysisConfig.CYCLES_METHOD
 
     # Print exact frequencies being used
-    print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
+    print(f"Using {n_freqs} logarithmically spaced frequencies:")
     print(f"   Range: {freq_range[0]:.2f} - {freq_range[1]:.2f} Hz")
     print(f"   Frequencies: {[f'{f:.2f}' for f in freqs]}")
     print(f"   N-cycles: {[f'{nc:.1f}' for nc in n_cycles]}")
@@ -183,7 +183,7 @@ def compute_roi_theta_spectrogram(eeg_data: np.ndarray,
     
     # Process each channel individually
     for i, ch_idx in enumerate(roi_channels):
-        print(f"Processing channel {ch_idx} ({i+1}/{len(roi_channels)})")
+        print(f"channel {ch_idx} ({i+1}/{len(roi_channels)})")
         
         # Extract channel data
         eeg_channel = eeg_data[ch_idx, :]
@@ -264,7 +264,7 @@ def compute_high_res_theta_spectrogram(eeg_data: np.ndarray,
     # Cycles method controlled via AnalysisConfig.CYCLES_METHOD
     
     print(f"Computing high-resolution theta spectrogram...")
-    print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
+    print(f"Using {n_freqs} logarithmically spaced frequencies:")
     print(f"   Range: {freq_range[0]:.2f} - {freq_range[1]:.2f} Hz")
     print(f"   Frequencies: {[f'{f:.2f}' for f in freqs]}")
     print(f"   N-cycles: {[f'{nc:.1f}' for nc in n_cycles]}")

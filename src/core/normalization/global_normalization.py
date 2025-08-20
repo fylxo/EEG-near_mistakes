@@ -6,7 +6,7 @@ This script performs NM theta analysis across multiple rats for 3-7Hz range,
 extracting windows from -0.2 to 0 seconds and averaging across time, frequency,
 windows, sessions, and rats.
 
-Author: Generated for cross-rats EEG near-mistake analysis
+Global normalization implementation for cross-rats EEG near-mistake analysis
 """
 
 import os
@@ -457,7 +457,7 @@ def aggregate_cross_rats_3_7hz_results(
         Cross-rats aggregated results
     """
     if verbose:
-        print(f"\n📊 Aggregating 3-7Hz results across {len(rat_results)} rats")
+        print(f"\nProcessing Aggregating 3-7Hz results across {len(rat_results)} rats")
         print("=" * 60)
     
     # Filter out failed results
@@ -481,7 +481,7 @@ def aggregate_cross_rats_3_7hz_results(
     # Collect averaged values from all rats
     for rat_id, results in valid_results.items():
         if verbose:
-            print(f"Processing results from rat {rat_id}")
+            print(f"results from rat {rat_id}")
         
         for nm_size, window_data in results['processed_windows'].items():
             aggregated_nm_sizes[nm_size]['averaged_values'].append(window_data['averaged_value'])
@@ -718,7 +718,7 @@ def run_cross_rats_3_7hz_analysis(
     failed_rats = [rat_id for rat_id, results in rat_results.items() if results is None]
     
     print("\n" + "=" * 80)
-    print("📊 3-7Hz ANALYSIS SUMMARY")
+    print("Processing 3-7Hz ANALYSIS SUMMARY")
     print("=" * 80)
     print(f"Total rats attempted: {len(rat_ids)}")
     print(f"Successfully processed: {len(successful_rats)}")

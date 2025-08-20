@@ -178,7 +178,7 @@ def monitor_memory_usage(operation_name: str, log_file: str = None, verbose: boo
     monitor = MemoryMonitor(log_file=log_file)
     
     if verbose:
-        print(f"📊 Starting memory monitoring for: {operation_name}")
+        print(f"Starting memory monitoring for: {operation_name}")
     
     try:
         monitor.start_monitoring()
@@ -188,7 +188,7 @@ def monitor_memory_usage(operation_name: str, log_file: str = None, verbose: boo
         summary = monitor.stop_monitoring()
         
         if verbose:
-            print(f"📊 Memory summary for {operation_name}:")
+            print(f"Memory summary for {operation_name}:")
             print(f"  Start: {summary['start_memory_mb']:.1f} MB")
             print(f"  Peak: {summary['peak_memory_mb']:.1f} MB")
             print(f"  Final: {summary['final_memory_mb']:.1f} MB")
@@ -321,7 +321,7 @@ def log_memory_warning(operation: str, estimates: Dict, verbose: bool = True):
     
     elif estimates['estimated_requirement_gb'] > 2.0:
         info_msg = (
-            f"📊 Memory info for {operation}:\n"
+            f"Processing Memory info for {operation}:\n"
             f"   Estimated requirement: {estimates['estimated_requirement_gb']:.1f} GB\n"
             f"   Available memory: {estimates['available_memory_gb']:.1f} GB\n"
             f"   Status: Should be sufficient"

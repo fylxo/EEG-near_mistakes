@@ -5,7 +5,7 @@ Cross-Rats NM Theta Analysis
 This script performs NM theta analysis across multiple rats, aggregating results
 from individual rat multi-session analyses.
 
-Author: Generated for cross-rats EEG near-mistake analysis
+Global cross-rats theta analysis implementation for EEG near-mistake research
 """
 
 import os
@@ -423,7 +423,7 @@ def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False, verbo
                 print(f"❌ Excluding rat 9442 (no ROI specified for compatibility check)")
     
     if verbose:
-        print(f"\n📊 Final rat selection:")
+        print(f"\nProcessing Final rat selection:")
         print(f"  Total rats found: {len(rat_ids_list) + len(excluded_rats)}")
         print(f"  Rats to process: {len(rat_ids_list)}")
         if excluded_rats:
@@ -682,7 +682,7 @@ def aggregate_cross_rats_results(
         Cross-rats aggregated results
     """
     if verbose:
-        print(f"\n📊 Aggregating results across {len(rat_results)} rats")
+        print(f"\nProcessing Aggregating results across {len(rat_results)} rats")
         print("=" * 60)
     
     # Filter out failed results
@@ -711,7 +711,7 @@ def aggregate_cross_rats_results(
     # Collect spectrograms from all rats
     for rat_id, results in valid_results.items():
         if verbose:
-            print(f"Processing results from rat {rat_id}")
+            print(f"results from rat {rat_id}")
             
             # Debug: Print available keys
             print(f"  Available keys in results: {list(results.keys())}")
@@ -894,7 +894,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
     #vmax = 0.22
     
     if verbose:
-        print(f"📊 Color map limits: [{vmin}, {vmax}] (calculated from data)")
+        print(f"Color map limits: [{vmin}, {vmax}] (calculated from data)")
     
     fig, axes = plt.subplots(n_nm_sizes, 1, figsize=(10, 5 * n_nm_sizes))
     if n_nm_sizes == 1:
@@ -1166,7 +1166,7 @@ def run_cross_rats_analysis(
         actual_freq_max = float(frequencies[-1])
         
         if verbose:
-            print(f"📁 Using frequencies from file: {freq_file_path}")
+            print(f"Loading frequencies from file: {freq_file_path}")
             print(f"   Total frequencies in file: {len(load_frequencies_from_file(freq_file_path))}")
             print(f"   Frequencies in range {freq_min}-{freq_max} Hz: {actual_n_freqs}")
             print(f"   Effective range: {actual_freq_min:.2f}-{actual_freq_max:.2f} Hz")
@@ -1284,7 +1284,7 @@ def run_cross_rats_analysis(
     
     # Create interactive spectrograms
     if verbose:
-        print("\n📊 Creating interactive spectrograms...")
+        print("\nProcessing Creating interactive spectrograms...")
     try:
         interactive_figs = add_interactive_to_results(
             results=aggregated_results,
@@ -1298,7 +1298,7 @@ def run_cross_rats_analysis(
     
     # Print analysis completion and error summary
     print("\n" + "=" * 80)
-    print("📊 ANALYSIS SUMMARY")
+    print("Processing ANALYSIS SUMMARY")
     print("=" * 80)
     print(f"Total rats attempted: {len(rat_ids)}")
     print(f"Successfully processed: {len(successful_rats)}")
@@ -1478,7 +1478,7 @@ def run_all_channels_analysis(
     else:
         channels = [int(ch) for ch in channels]
     
-    print(f"📊 Processing {len(channels)} channels: {channels}")
+    print(f"Processing {len(channels)} channels: {channels}")
     
     # Create main results directory
     all_channels_dir = os.path.join(base_save_path, 'all_channels_analysis')
@@ -1610,7 +1610,7 @@ def run_all_channels_analysis(
     print(f"\n{'='*80}")
     print("✅ All Channels Analysis Completed!")
     print(f"{'='*80}")
-    print(f"📊 Summary:")
+    print(f"Summary:")
     print(f"  Total channels processed: {len(channels)}")
     print(f"  Successful: {len(successful_channels)}")
     print(f"  Failed: {len(failed_channels)}")

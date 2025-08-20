@@ -90,7 +90,7 @@ def run_analysis_with_resilience(
         raise ValueError(f"No sessions found for rat {rat_id}")
     
     if verbose:
-        print(f"📊 Found {len(rat_sessions)} sessions for rat {rat_id}")
+        print(f"Found {len(rat_sessions)} sessions for rat {rat_id}")
     
     # Setup session processor
     session_processor = SessionProcessor(
@@ -164,7 +164,7 @@ def run_analysis_with_resilience(
     processing_summary = results['processing_summary']
     
     if verbose:
-        print(f"📊 Session processing complete:")
+        print(f"Session processing complete:")
         print(f"   Successful: {len(successful_sessions)}/{len(rat_sessions)}")
         print(f"   Failed: {len(failed_sessions)}/{len(rat_sessions)}")
         print(f"   Success rate: {processing_summary['success_rate']:.1f}%")
@@ -175,7 +175,7 @@ def run_analysis_with_resilience(
     
     # Now aggregate the successful sessions
     if verbose:
-        print(f"🔄 Aggregating {len(successful_sessions)} successful sessions...")
+        print(f"Parallel processing Aggregating {len(successful_sessions)} successful sessions...")
     
     # This is a simplified aggregation - in practice, you'd need to properly
     # combine the session results according to your analysis protocol
@@ -231,7 +231,7 @@ def aggregate_session_results(session_results: Dict[str, Dict],
         Aggregated multi-session results
     """
     if verbose:
-        print(f"🔄 Aggregating {len(session_results)} session results...")
+        print(f"Parallel processing Aggregating {len(session_results)} session results...")
     
     # Extract common information from first session
     first_session_result = next(iter(session_results.values()))

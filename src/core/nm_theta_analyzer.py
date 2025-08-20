@@ -14,7 +14,7 @@ Usage Methods:
     1. IDE Usage: Modify parameters in code and run directly
     2. Command Line Usage: Use command-line arguments
 
-Author: Generated for unified EEG near-mistake analysis interface
+Unified interface for EEG near-mistake theta analysis
 """
 
 import argparse
@@ -28,41 +28,41 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def print_method_info(mode: str, method: str, parallel_type: str = None):
     """Print information about the selected analysis method."""
-    print("🔧 ANALYSIS METHOD SELECTION")
+    print("ANALYSIS METHOD SELECTION")
     print("=" * 50)
     
     if mode == "single":
         if method == "basic":
-            print("📋 Selected: Single Session Basic Analysis")
-            print("   • Implementation: nm_theta_single_basic.py")
-            print("   • Processing: Sequential, single-threaded")
-            print("   • Memory usage: Standard")
-            print("   • Speed: Baseline")
-            print("   • Best for: Small datasets, testing, simple analysis")
+            print("Selected: Single Session Basic Analysis")
+            print("   Implementation: nm_theta_single_basic.py")
+            print("   Processing: Sequential, single-threaded")
+            print("   Memory usage: Standard")
+            print("   Speed: Baseline")
+            print("   Best for: Small datasets, testing, simple analysis")
             
         elif method == "parallel":
-            print("📋 Selected: Single Session Parallel Analysis")
-            print("   • Implementation: nm_theta_single_parallel.py")
-            print(f"   • Processing: Multi-threaded ({parallel_type})")
-            print("   • Memory usage: Standard")
-            print("   • Speed: Fast (parallelized channels)")
-            print("   • Best for: Multi-core systems, faster processing")
+            print("Selected: Single Session Parallel Analysis")
+            print("   Implementation: nm_theta_single_parallel.py")
+            print(f"   Processing: Multi-threaded ({parallel_type})")
+            print("   Memory usage: Standard")
+            print("   Speed: Fast (parallelized channels)")
+            print("   Best for: Multi-core systems, faster processing")
             
         elif method == "vectorized":
-            print("📋 Selected: Single Session Vectorized Analysis")
-            print("   • Implementation: nm_theta_single_vectorized.py")
-            print("   • Processing: Vectorized CWT (scipy)")
-            print("   • Memory usage: Optimized with chunking")
-            print("   • Speed: Fastest (batch frequency processing)")
-            print("   • Best for: Maximum speed, large frequency ranges")
+            print("Selected: Single Session Vectorized Analysis")
+            print("   Implementation: nm_theta_single_vectorized.py")
+            print("   Processing: Vectorized CWT (scipy)")
+            print("   Memory usage: Optimized with chunking")
+            print("   Speed: Fastest (batch frequency processing)")
+            print("   Best for: Maximum speed, large frequency ranges")
             
     elif mode == "multi":
-        print("📋 Selected: Multi-Session Analysis")
-        print("   • Implementation: nm_theta_multi_session.py")
-        print("   • Processing: Memory-efficient sequential")
-        print("   • Memory usage: Minimal (load-process-save)")
-        print("   • Speed: Moderate (optimized for memory)")
-        print("   • Best for: Multiple sessions, memory-constrained systems")
+        print("Selected: Multi-Session Analysis")
+        print("   Implementation: nm_theta_multi_session.py")
+        print("   Processing: Memory-efficient sequential")
+        print("   Memory usage: Minimal (load-process-save)")
+        print("   Speed: Moderate (optimized for memory)")
+        print("   Best for: Multiple sessions, memory-constrained systems")
     
     print("=" * 50)
 
@@ -76,22 +76,22 @@ def validate_parameters(mode, method, parallel_type, session_index, rat_id, pkl_
         if session_index is None:
             errors.append("Single session mode requires session_index")
         if rat_id is not None:
-            print("⚠️  Warning: rat_id ignored in single session mode")
+            print("Warning: rat_id ignored in single session mode")
             
     elif mode == "multi":
         if rat_id is None:
             errors.append("Multi-session mode requires rat_id")
         if session_index is not None:
-            print("⚠️  Warning: session_index ignored in multi-session mode")
+            print("Warning: session_index ignored in multi-session mode")
         if method != "basic":
-            print("⚠️  Warning: Multi-session mode uses memory-efficient processing (method ignored)")
+            print("Warning: Multi-session mode uses memory-efficient processing (method ignored)")
     
     # Method-specific validations
     if method == "parallel" and parallel_type is None:
         errors.append("Parallel method requires parallel_type (threading or multiprocessing)")
     
     if method != "parallel" and parallel_type is not None:
-        print("⚠️  Warning: parallel_type ignored (only used with parallel method)")
+        print("Warning: parallel_type ignored (only used with parallel method)")
     
     # File existence
     if not os.path.exists(pkl_path):
@@ -102,9 +102,9 @@ def validate_parameters(mode, method, parallel_type, session_index, rat_id, pkl_
         errors.append("freq_min must be less than freq_max")
     
     if len(errors) > 0:
-        print("❌ Parameter validation errors:")
+        print("Parameter validation errors:")
         for error in errors:
-            print(f"   • {error}")
+            print(f"   - {error}")
         return False
     
     return True
@@ -226,12 +226,12 @@ def main():
     """
     Main orchestrator function with dual-mode support.
     
-    🎯 FOR IDE USAGE: Modify the parameters below and run directly
-    🖥️ FOR COMMAND LINE: Use arguments like --mode single --roi frontal etc.
+    For IDE usage: Modify the parameters below and run directly
+    For command line: Use arguments like --mode single --roi frontal etc.
     """
     
     # =============================================================================
-    # 🎯 IDE CONFIGURATION - MODIFY THESE PARAMETERS FOR IDE USAGE
+    # IDE CONFIGURATION - MODIFY THESE PARAMETERS FOR IDE USAGE
     # =============================================================================
     
     # Analysis mode and method
@@ -264,14 +264,14 @@ def main():
     show_frequency_profiles = False  # Show frequency profiles (single session only)
     
     # =============================================================================
-    # 🖥️ COMMAND LINE DETECTION AND PARSING
+    # COMMAND LINE DETECTION AND PARSING
     # =============================================================================
     
     # Check if command line arguments were provided
     use_command_line = len(sys.argv) > 1
     
     if use_command_line:
-        print("📋 Using command line arguments...")
+        print("Using command line arguments...")
         parser = argparse.ArgumentParser(
             description='Unified NM Theta Analysis Interface',
             formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -362,7 +362,7 @@ Examples:
         show_frequency_profiles = args.show_frequency_profiles
         
     else:
-        print("📋 Using IDE parameter configuration...")
+        print("Using IDE parameter configuration...")
         print(f"   Mode: {mode}")
         print(f"   Method: {method}")
         print(f"   ROI: {roi}")
@@ -372,11 +372,11 @@ Examples:
             print(f"   Rat ID: {rat_id}")
     
     # =============================================================================
-    # 🚀 RUN ANALYSIS
+    # RUN ANALYSIS
     # =============================================================================
     
     # Print header
-    print("\n🧠 NM THETA ANALYSIS ORCHESTRATOR")
+    print("\nNM THETA ANALYSIS ORCHESTRATOR")
     print("=" * 50)
     print(f"Mode: {mode}")
     print(f"Method: {method}")
@@ -403,31 +403,31 @@ Examples:
         )
         
         # Print success summary
-        print("\n🎉 ANALYSIS COMPLETED SUCCESSFULLY!")
+        print("\nANALYSIS COMPLETED SUCCESSFULLY!")
         print("=" * 50)
         
         if mode == "single":
-            print(f"✓ Session analyzed: {session_index}")
-            print(f"✓ ROI channels: {results.get('roi_channels', 'N/A')}")
+            print(f"Session analyzed: {session_index}")
+            print(f"ROI channels: {results.get('roi_channels', 'N/A')}")
             if 'normalized_windows' in results:
-                print(f"✓ NM sizes found: {list(results['normalized_windows'].keys())}")
+                print(f"NM sizes found: {list(results['normalized_windows'].keys())}")
                 total_events = sum(data['n_events'] for data in results['normalized_windows'].values())
-                print(f"✓ Total events: {total_events}")
+                print(f"Total events: {total_events}")
         
         elif mode == "multi":
-            print(f"✓ Rat ID: {rat_id}")
-            print(f"✓ Sessions analyzed: {results.get('n_sessions_analyzed', 'N/A')}")
+            print(f"Rat ID: {rat_id}")
+            print(f"Sessions analyzed: {results.get('n_sessions_analyzed', 'N/A')}")
             if 'aggregated_windows' in results:
-                print(f"✓ NM sizes found: {list(results['aggregated_windows'].keys())}")
+                print(f"NM sizes found: {list(results['aggregated_windows'].keys())}")
                 for nm_size, data in results['aggregated_windows'].items():
                     print(f"  - NM size {nm_size}: {data['total_events']} events from {data['n_sessions']} sessions")
         
-        print(f"✓ Results saved to: {save_path if save_path else 'auto-generated path'}")
+        print(f"Results saved to: {save_path if save_path else 'auto-generated path'}")
         
         return True
         
     except Exception as e:
-        print(f"\n❌ ANALYSIS FAILED!")
+        print(f"\nANALYSIS FAILED!")
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()

@@ -23,7 +23,7 @@ Usage:
     # Multi-session with memory-efficient processing
     python nm_theta_vectorized.py --mode multi --rat_id 10501 --roi frontal --n_jobs 4
 
-Author: Generated for EEG near-mistake vectorized analysis
+Vectorized implementation for optimized EEG near-mistake theta analysis
 """
 
 import numpy as np
@@ -329,7 +329,7 @@ def compute_roi_theta_spectrogram_vectorized(
     freqs = np.geomspace(freq_range[0], freq_range[1], n_freqs)
     n_cycles = np.maximum(3, freqs * n_cycles_factor)
     
-    print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
+    print(f"Using {n_freqs} logarithmically spaced frequencies:")
     print(f"   Range: {freq_range[0]:.2f} - {freq_range[1]:.2f} Hz")
     print(f"   Method: {method} ({'scipy CWT' if method == 'cwt' else 'manual wavelets'})")
     

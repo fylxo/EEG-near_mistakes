@@ -11,7 +11,7 @@ Key Features:
 - Normalizes the full event window using these baseline statistics
 - This is the main analysis script for cross-rats theta analysis
 
-Author: Generated for cross-rats EEG near-mistake analysis with pre-event normalization
+Hierarchical cross-rats theta analysis implementation for EEG near-mistake research
 """
 
 import os
@@ -142,7 +142,7 @@ def compute_baseline_reliability_weights(rat_results: Dict, nm_size: str, verbos
         try:
             nm_size_float = float(nm_size)
             if verbose:
-                print(f"      🔄 Converted nm_size from '{nm_size}' (type: {type(nm_size)}) to {nm_size_float} (type: {type(nm_size_float)})")
+                print(f"      Parallel processing Converted nm_size from '{nm_size}' (type: {type(nm_size)}) to {nm_size_float} (type: {type(nm_size_float)})")
         except (ValueError, TypeError):
             if verbose:
                 print(f"      ❌ Invalid NM size format: {nm_size}")
@@ -158,7 +158,7 @@ def compute_baseline_reliability_weights(rat_results: Dict, nm_size: str, verbos
         window_data = results['averaged_windows'][nm_size_float]
         
         if verbose:
-            print(f"      📊 Window data keys: {list(window_data.keys())}")
+            print(f"      Processing Window data keys: {list(window_data.keys())}")
         
         # Try to get baseline stats from the rat's data
         baseline_stats = None
@@ -197,7 +197,7 @@ def compute_baseline_reliability_weights(rat_results: Dict, nm_size: str, verbos
             print(f"      ✅ Rat {rat_id} added to valid rats")
     
     if verbose:
-        print(f"    📊 Summary:")
+        print(f"    Processing Summary:")
         print(f"      Rats with valid baseline stats: {len(baseline_reliabilities)}")
         print(f"      Rats missing baseline stats: {len(missing_stats_rats)} - {missing_stats_rats}")
         print(f"      Rats with invalid baseline stats: {len(invalid_stats_rats)} - {invalid_stats_rats}")
@@ -231,7 +231,7 @@ def compute_baseline_reliability_weights(rat_results: Dict, nm_size: str, verbos
     
     if verbose:
         print(f"    ✅ SUCCESS: Using simple unweighted averaging!")
-        print(f"    📊 Valid rats for averaging: {sorted(valid_rats)}")
+        print(f"    Processing Valid rats for averaging: {sorted(valid_rats)}")
     
     return {
         'valid_rats': valid_rats,
@@ -304,7 +304,7 @@ def robust_cross_rat_average(spectrograms: np.ndarray, weights: Dict[str, float]
         simple_average = np.mean(spectrograms, axis=0)
         max_diff = np.max(np.abs(weighted_sum - simple_average))
         print(f"       ✅ Weighted average computed")
-        print(f"       📊 Max difference from simple average: {max_diff:.6f}")
+        print(f"       Processing Max difference from simple average: {max_diff:.6f}")
         
         if max_diff < 1e-12:
             print(f"       ⚠️  WARNING: Weighted average is nearly identical to simple average!")
@@ -819,7 +819,7 @@ def discover_rat_ids(pkl_path: str, exclude_20_channel_rats: bool = False, verbo
                 print(f"❌ Excluding rat 9442 (no ROI specified for compatibility check)")
     
     if verbose:
-        print(f"\n📊 Final rat selection:")
+        print(f"\nProcessing Final rat selection:")
         print(f"  Total rats found: {len(rat_ids_list) + len(excluded_rats)}")
         print(f"  Rats to process: {len(rat_ids_list)}")
         if excluded_rats:
@@ -1079,7 +1079,7 @@ def aggregate_cross_rats_results(
         Cross-rats aggregated results
     """
     if verbose:
-        print(f"\n📊 Aggregating results across {len(rat_results)} rats")
+        print(f"\nProcessing Aggregating results across {len(rat_results)} rats")
         print("=" * 60)
     
     # Filter out failed results
@@ -1108,7 +1108,7 @@ def aggregate_cross_rats_results(
     # Collect spectrograms from all rats
     for rat_id, results in valid_results.items():
         if verbose:
-            print(f"Processing results from rat {rat_id}")
+            print(f"results from rat {rat_id}")
             
             # Debug: Print available keys
             print(f"  Available keys in results: {list(results.keys())}")
@@ -1155,7 +1155,7 @@ def aggregate_cross_rats_results(
             # Use reliability-weighted averaging
             if verbose:
                 print(f"✅ USING RELIABILITY-WEIGHTED AVERAGING!")
-                print(f"   📊 Weights: {weights_info['weights']}")
+                print(f"   Processing Weights: {weights_info['weights']}")
                 print(f"   🐀 Rat order in spectrograms: {data['rat_ids']}")
                 
             avg_spectrogram = robust_cross_rat_average(
@@ -1353,7 +1353,7 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
     #vmax = 0.22
     
     if verbose:
-        print(f"📊 Color map limits: [{vmin}, {vmax}] (calculated from data)")
+        print(f"Color map limits: [{vmin}, {vmax}] (calculated from data)")
     
     fig, axes = plt.subplots(n_nm_sizes, 1, figsize=(10, 5 * n_nm_sizes))
     if n_nm_sizes == 1:
@@ -1632,7 +1632,7 @@ def run_cross_rats_analysis(
         actual_freq_max = float(frequencies[-1])
         
         if verbose:
-            print(f"📁 Using frequencies from file: {freq_file_path}")
+            print(f"Loading frequencies from file: {freq_file_path}")
             print(f"   Total frequencies in file: {len(load_frequencies_from_file(freq_file_path))}")
             print(f"   Frequencies in range {freq_min}-{freq_max} Hz: {actual_n_freqs}")
             print(f"   Effective range: {actual_freq_min:.2f}-{actual_freq_max:.2f} Hz")
@@ -1751,7 +1751,7 @@ def run_cross_rats_analysis(
     
     # Create interactive spectrograms
     if verbose:
-        print("\n📊 Creating interactive spectrograms...")
+        print("\nProcessing Creating interactive spectrograms...")
     try:
         interactive_figs = add_interactive_to_results(
             results=aggregated_results,
@@ -1765,7 +1765,7 @@ def run_cross_rats_analysis(
     
     # Print analysis completion and error summary
     print("\n" + "=" * 80)
-    print("📊 PRE-EVENT NORMALIZATION ANALYSIS SUMMARY")
+    print("Processing PRE-EVENT NORMALIZATION ANALYSIS SUMMARY")
     print("=" * 80)
     print(f"Total rats attempted: {len(rat_ids)}")
     print(f"Successfully processed: {len(successful_rats)}")
@@ -2114,14 +2114,14 @@ if __name__ == "__main__":
         )
         
         print("\n✅ HIERARCHICAL Analysis completed!")
-        print("📊 HIERARCHICAL RESULTS BY NM SIZE:")
+        print("Processing HIERARCHICAL RESULTS BY NM SIZE:")
         for nm_size in ['nm_1', 'nm_2', 'nm_3']:
             if nm_size in hierarchical_results['by_nm_size']:
                 data = hierarchical_results['by_nm_size'][nm_size]
                 print(f"  {nm_size.upper()}: Mean = {data['mean']:.6f}, SEM = {data['sem']:.6f}, N = {data['n_rats']}")
         
         # Compare with original results
-        print("\n📊 ORIGINAL RESULTS (for comparison):")
+        print("\nProcessing ORIGINAL RESULTS (for comparison):")
         if 'aggregated_results' in results:
             orig_data = results['aggregated_results']
             print(f"  Overall: Mean = {orig_data['mean_theta_power']:.6f}, SEM = {orig_data['sem_theta_power']:.6f}, N = {orig_data['n_rats']}")

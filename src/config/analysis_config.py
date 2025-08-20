@@ -20,15 +20,15 @@ class AnalysisConfig:
     # =============================================================================
     
     # Theta band frequency range (Hz)
-    THETA_MIN_FREQ = 4.0
-    THETA_MAX_FREQ = 8.0
+    THETA_MIN_FREQ = 3.0
+    THETA_MAX_FREQ = 7.0
     
     # Full frequency analysis range (Hz)
     FREQ_MIN_DEFAULT = 1.0
     FREQ_MAX_DEFAULT = 45.0
     
     # Number of frequencies for analysis
-    N_FREQS_DEFAULT = 30
+    N_FREQS_DEFAULT = 12
     N_FREQS_HIGH_RES = 40
     
     # Spectral analysis method
@@ -46,8 +46,8 @@ class AnalysisConfig:
     # SPECTRAL RESOLUTION SETTINGS (CYCLES)
     # =============================================================================
     
-    # Cycles method: 'fixed', 'adaptive', or 'hybrid'
-    CYCLES_METHOD = 'fixed'  # TESTING: Use fixed 5 cycles to check artifacts
+    # Cycles method: 'fixed', 'adaptive', 'hybrid', or 'custom'
+    CYCLES_METHOD = 'custom'
     
     # Fixed cycles (used when method='fixed')
     CYCLES_FIXED = 5
@@ -56,13 +56,11 @@ class AnalysisConfig:
     N_CYCLES_FACTOR_DEFAULT = 1.0  # Multiplier: n_cycles = freq * factor
     CYCLES_MIN = 6                 # Minimum cycles (for hybrid mode)
     
-    # Legacy parameter (kept for backward compatibility)
-    # Will be removed in future versions - use CYCLES_* settings instead
     @classmethod
     def get_n_cycles_factor(cls):
         """Get n_cycles_factor based on current cycles method."""
         if cls.CYCLES_METHOD == 'fixed':
-            return 0.1  # Force max(CYCLES_MIN, freq*0.1) = CYCLES_MIN
+            return 0.1
         else:
             return cls.N_CYCLES_FACTOR_DEFAULT
     
@@ -177,6 +175,11 @@ class AnalysisConfig:
             return frequencies * cls.N_CYCLES_FACTOR_DEFAULT
         elif cls.CYCLES_METHOD == 'hybrid':
             return np.maximum(cls.CYCLES_MIN, frequencies * cls.N_CYCLES_FACTOR_DEFAULT)
+        elif cls.CYCLES_METHOD == 'custom':
+            # Custom cycles: 3 cycles at 3-5 Hz, 4 cycles at 6-7 Hz
+            n_cycles = np.full_like(frequencies, 3.0, dtype=float)  # Default to 3 cycles
+            n_cycles[frequencies >= 6.0] = 4.0  # 4 cycles for frequencies >= 6 Hz
+            return n_cycles
         else:
             raise ValueError(f"Unknown cycles method: {cls.CYCLES_METHOD}")
 

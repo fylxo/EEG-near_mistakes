@@ -58,7 +58,7 @@ class SessionProcessor:
         for attempt in range(self.max_retries + 1):  # +1 for initial attempt
             try:
                 if self.verbose and attempt > 0:
-                    print(f"    🔄 Retry {attempt}/{self.max_retries} for session {session_id}")
+                    print(f"    Parallel processing Retry {attempt}/{self.max_retries} for session {session_id}")
                 
                 # Process the session
                 result = process_func(*args, **kwargs)
@@ -145,13 +145,13 @@ class SessionProcessor:
         }
         
         if self.verbose:
-            print(f"🔄 Processing {len(sessions)} sessions with resilience...")
+            print(f"Parallel processing Processing {len(sessions)} sessions with resilience...")
         
         for i, session_id in enumerate(sessions):
             processing_summary['attempted'] += 1
             
             if self.verbose:
-                print(f"\n📊 Processing session {session_id} ({i+1}/{len(sessions)})")
+                print(f"\nProcessing Processing session {session_id} ({i+1}/{len(sessions)})")
             
             # Get session-specific arguments
             if session_args_func:
@@ -187,7 +187,7 @@ class SessionProcessor:
         )
         
         if self.verbose:
-            print(f"\n📊 Session processing summary:")
+            print(f"\nProcessing Session processing summary:")
             print(f"  Total sessions: {processing_summary['total_sessions']}")
             print(f"  Successful: {processing_summary['successful']}")
             print(f"  Failed: {processing_summary['failed']}")
@@ -270,7 +270,7 @@ def process_with_memory_aware_batching(items: List[Any], process_func,
     current_batch_size = batch_size
     
     if verbose:
-        print(f"🔄 Processing {len(items)} items in adaptive batches...")
+        print(f"Parallel processing Processing {len(items)} items in adaptive batches...")
     
     for i in range(0, len(items), current_batch_size):
         batch = items[i:i + current_batch_size]

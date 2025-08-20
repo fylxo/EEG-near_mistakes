@@ -21,7 +21,7 @@ Usage:
     # Multi-session with parallel processing
     python nm_theta_parallel.py --mode multi --rat_id 10501 --roi frontal --n_jobs 4
 
-Author: Generated for EEG near-mistake parallel analysis
+Parallel implementation for multi-threaded EEG near-mistake theta analysis
 """
 
 import numpy as np
@@ -163,11 +163,11 @@ def compute_roi_theta_spectrogram_parallel(
     channel_powers : np.ndarray
         Individual channel powers (n_channels, n_freqs, n_times)
     """
-    print(f"🔄 PARALLEL CHANNEL PROCESSING ({method})")
+    print(f"Parallel processing PARALLEL CHANNEL PROCESSING ({method})")
     print(f"   Channels: {len(roi_channels)}, Jobs: {n_jobs or 'auto'}")
     
     # Verification
-    print(f"📊 PROCESSING VERIFICATION:")
+    print("Processing verification:")
     print(f"   Using {len(roi_channels)} channels: {sorted(roi_channels)}")
     print(f"   EEG data shape: {eeg_data.shape}")
     print(f"   Each channel will be z-score normalized individually, then averaged")
@@ -177,7 +177,7 @@ def compute_roi_theta_spectrogram_parallel(
     n_cycles = np.maximum(3, freqs * n_cycles_factor)
     
     # Print exact frequencies being used
-    print(f"📊 Using {n_freqs} logarithmically spaced frequencies:")
+    print(f"Using {n_freqs} logarithmically spaced frequencies:")
     print(f"   Range: {freq_range[0]:.2f} - {freq_range[1]:.2f} Hz")
     print(f"   Frequencies: {[f'{f:.2f}' for f in freqs]}")
     print(f"   N-cycles: {[f'{nc:.1f}' for nc in n_cycles]}")
@@ -616,7 +616,7 @@ def aggregate_session_results_parallel(session_summaries: List[Dict],
     if not successful_summaries:
         raise ValueError("No sessions were successfully analyzed!")
     
-    print(f"📊 Aggregating {len(successful_summaries)} successful sessions...")
+    print(f"Aggregating {len(successful_summaries)} successful sessions...")
     
     # Load first session to get common parameters
     first_summary = successful_summaries[0]

@@ -5,7 +5,7 @@ NM Theta Power Plots
 This script loads existing cross-rats results and creates theta band power plots
 showing mean ± 1 SE for different near-mistake types across brain regions.
 
-Author: Generated for EEG near-mistake theta power analysis
+Theta power visualization tools for EEG near-mistake analysis
 """
 
 import os
@@ -190,7 +190,7 @@ def create_theta_power_plots(results: Dict, save_path: str,
         theta_range = AnalysisConfig.get_theta_range()
     
     if verbose:
-        print(f"\n📊 Creating theta power plots (mean ± 1 SE)")
+        print(f"\nProcessing Creating theta power plots (mean ± 1 SE)")
         print(f"Theta range: {theta_range[0]}-{theta_range[1]} Hz")
         if time_window:
             print(f"Time window: {time_window[0]}-{time_window[1]} s")

@@ -9,7 +9,7 @@ around Near Mistake (NM) events. It shows:
 3. Single-event raw and z-scored windows with event alignment
 4. Detailed numerical analysis of power values, means, and z-scores
 
-Author: Generated for EEG near-mistake analysis diagnostics
+Diagnostic tools for theta z-score analysis in EEG near-mistake research
 """
 
 import numpy as np

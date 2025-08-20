@@ -14,7 +14,7 @@ The key functions are:
 This provides event-specific normalization that is more sensitive to changes
 relative to the immediate pre-event baseline.
 
-Author: Generated for baseline-normalized EEG near-mistake analysis
+Baseline normalization implementation for EEG near-mistake analysis
 """
 
 import numpy as np
@@ -80,7 +80,7 @@ def compute_baseline_statistics(nm_windows: Dict,
         windows = data['windows']  # (n_events, n_freqs, n_times)
         n_events, n_freqs, n_times = windows.shape
         
-        print(f"Processing NM size {size}: {n_events} events, {n_freqs} frequencies")
+        print(f"NM size {size}: {n_events} events, {n_freqs} frequencies")
         
         # Extract baseline period for all events
         baseline_windows = windows[:, :, baseline_indices]  # (n_events, n_freqs, n_baseline_samples)

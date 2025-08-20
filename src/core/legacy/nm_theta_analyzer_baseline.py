@@ -19,7 +19,7 @@ Usage Methods:
     1. IDE Usage: Modify parameters in code and run directly
     2. Command Line Usage: Use command-line arguments
 
-Author: Generated for unified EEG near-mistake analysis interface with baseline normalization
+Unified interface for EEG near-mistake analysis with baseline normalization
 """
 
 import argparse

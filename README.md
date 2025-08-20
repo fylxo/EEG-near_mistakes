@@ -195,4 +195,4 @@ The repository includes comprehensive tests:
 - **`tests/spectrogram_comparison.py`** - Method comparison
 - **`tests/test_roi_analysis.py`** - ROI functionality testing
 
-**Note**: This repository contains the complete computational pipeline used for EEG near-mistake analysis. For detailed scientific methodology, statistical results, and interpretation, please refer to [`scientific_report.tex`](scientific_report.tex).
+**Note**: This repository contains the complete computational pipeline used for EEG near-mistake analysis. For detailed scientific methodology, and interpretation, please refer to [`scientific_report.tex`](scientific_report.tex).

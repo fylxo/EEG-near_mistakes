@@ -176,9 +176,17 @@ class AnalysisConfig:
         elif cls.CYCLES_METHOD == 'hybrid':
             return np.maximum(cls.CYCLES_MIN, frequencies * cls.N_CYCLES_FACTOR_DEFAULT)
         elif cls.CYCLES_METHOD == 'custom':
-            # Custom cycles: 3 cycles at 3-5 Hz, 4 cycles at 6-7 Hz
+            # Custom cycles: gradual scaling from 3 to 4 cycles across 3-7 Hz range
             n_cycles = np.full_like(frequencies, 3.0, dtype=float)  # Default to 3 cycles
-            n_cycles[frequencies >= 6.0] = 4.0  # 4 cycles for frequencies >= 6 Hz
+            
+            # Apply gradual scaling for frequencies in theta range (3-7 Hz)
+            theta_mask = (frequencies >= 3.0) & (frequencies <= 7.0)
+            if np.any(theta_mask):
+                theta_freqs = frequencies[theta_mask]
+                # Linear interpolation from 3 cycles at 3 Hz to 4 cycles at 7 Hz
+                # n_cycles = 3 + (freq - 3) * (4 - 3) / (7 - 3) = 3 + (freq - 3) / 4
+                n_cycles[theta_mask] = 3.0 + (theta_freqs - 3.0) / 4.0
+            
             return n_cycles
         else:
             raise ValueError(f"Unknown cycles method: {cls.CYCLES_METHOD}")

@@ -1308,7 +1308,7 @@ def calculate_color_limits(spectrograms: List[np.ndarray], percentile: float = 9
     return vmin, vmax
 
 
-def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: bool = True):
+def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: bool = True, show_plots: bool = True):
     """
     Create comprehensive visualizations for cross-rats results with pre-event normalization.
     
@@ -1320,6 +1320,8 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
         Directory to save visualizations
     verbose : bool
         Whether to print visualization progress (default: True)
+    show_plots : bool
+        Whether to display plots (default: True)
     """
     if verbose:
         print(f"\n📈 Creating cross-rats visualizations (Pre-event normalization)")
@@ -1454,7 +1456,10 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
     if verbose:
         print(f"✓ Spectrograms saved to: {plot_file}")
     
-    plt.show()
+    if show_plots:
+        plt.show()
+    else:
+        plt.close()
     
     # Create individual rat comparison plot
     if n_nm_sizes == 1:  # Only create if single NM size to avoid complexity
@@ -1532,7 +1537,10 @@ def create_cross_rats_visualizations(results: Dict, save_path: str, verbose: boo
             if verbose:
                 print(f"✓ Individual rats summary plot saved to: {individual_plot_file}")
             
-            plt.show()
+            if show_plots:
+                plt.show()
+            else:
+                plt.close()
         else:
             if verbose:
                 print("⚠️  Individual rat plots skipped (no rats to display)")
@@ -1746,7 +1754,8 @@ def run_cross_rats_analysis(
     create_cross_rats_visualizations(
         results=aggregated_results,
         save_path=save_path,
-        verbose=verbose
+        verbose=verbose,
+        show_plots=show_plots
     )
     
     # Create interactive spectrograms

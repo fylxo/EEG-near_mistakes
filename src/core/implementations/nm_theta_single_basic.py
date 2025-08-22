@@ -37,6 +37,112 @@ from normalization.baseline_normalization import (
 from utils.electrode_utils import get_channels, load_electrode_mappings, ROI_MAP
 
 
+def export_session_theta_power_csv(session_data: Dict,
+                                 normalized_windows: Dict,
+                                 frequencies: np.ndarray,
+                                 roi_channels: List[int],
+                                 roi_specification: str,
+                                 save_path: str) -> None:
+    """
+    Export session-level theta power data to CSV file.
+    
+    Extracts theta power for each NM size using the same mechanism as nm_theta_power_plots.py:
+    1. Filter frequencies to theta range (3-7 Hz)
+    2. Extract time window (-0.2 to 0 seconds)
+    3. Average across frequencies
+    4. Average across time
+    
+    Parameters:
+    -----------
+    session_data : Dict
+        Session data containing rat_id, session_date, etc.
+    normalized_windows : Dict
+        Normalized spectrograms organized by NM size
+    frequencies : np.ndarray
+        Frequency values for each frequency bin
+    roi_channels : List[int]
+        ROI channel indices
+    save_path : str
+        Directory to save the CSV file
+    """
+    import csv
+    from config import AnalysisConfig
+    
+    # Extract session information
+    rat_id = session_data.get('rat_id', 'unknown')
+    session_date = session_data.get('session_date', 'unknown')
+    
+    # Get theta frequency range (3-7 Hz)
+    theta_range = AnalysisConfig.get_theta_range()
+    theta_mask = (frequencies >= theta_range[0]) & (frequencies <= theta_range[1])
+    
+    if not np.any(theta_mask):
+        print(f"Warning: No frequencies found in theta range {theta_range}")
+        return
+    
+    # Extract theta power for each NM size
+    theta_powers = {}
+    
+    for nm_size, window_data in normalized_windows.items():
+        windows = window_data['windows']  # Shape: (n_events, n_freqs, n_times)
+        window_times = window_data['window_times']
+        
+        if windows.size == 0:
+            theta_powers[nm_size] = np.nan
+            continue
+        
+        # Extract theta frequencies
+        theta_windows = windows[:, theta_mask, :]  # Shape: (n_events, n_theta_freqs, n_times)
+        
+        # Average across theta frequencies
+        theta_time_series = np.mean(theta_windows, axis=1)  # Shape: (n_events, n_times)
+        
+        # Extract time window (-0.2 to 0 seconds) - same as nm_theta_power_plots.py
+        time_mask = (window_times >= -0.2) & (window_times <= 0.0)
+        
+        if np.any(time_mask):
+            theta_time_series = theta_time_series[:, time_mask]
+        
+        # Average across time to get single power value per event
+        event_theta_powers = np.mean(theta_time_series, axis=1)  # Shape: (n_events,)
+        
+        # Average across all events for this NM size
+        theta_powers[nm_size] = np.mean(event_theta_powers)
+    
+    # Prepare CSV data - save in electrode-specific subfolder within csv_exports/
+    # Navigate up to results directory from session folder (save_path structure: results/cross_rats/rat_X_mne/session_Y)
+    results_dir = os.path.dirname(os.path.dirname(os.path.dirname(save_path)))  # Go up to results/
+    electrode_folder = os.path.join(results_dir, 'csv_exports', f'electrode_{roi_specification}')
+    
+    # Create filename (no need for electrode in name since it's in the folder)
+    csv_filename = f"session_theta_power_{rat_id}_{session_date}.csv"
+    csv_path = os.path.join(electrode_folder, csv_filename)
+    
+    # Ensure electrode-specific directory exists
+    os.makedirs(electrode_folder, exist_ok=True)
+    
+    # Write CSV file
+    with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile, delimiter=';')
+        
+        # Header row
+        header = ['session_number', 'rat_ID', 'electrode_number']
+        nm_sizes = sorted(theta_powers.keys())
+        for nm_size in nm_sizes:
+            header.append(f'NM_size{nm_size}')
+        writer.writerow(header)
+        
+        # Data row
+        row = [session_date, rat_id, roi_specification]
+        for nm_size in nm_sizes:
+            row.append(f"{theta_powers[nm_size]:.6f}")
+        writer.writerow(row)
+    
+    print(f"✓ Session theta power exported to: {csv_path}")
+    print(f"  - NM sizes: {list(theta_powers.keys())}")
+    print(f"  - ROI channels: {roi_channels}")
+
+
 def get_electrode_numbers_from_channels(rat_id: Union[str, int], 
                                        channel_indices: List[int], 
                                        mapping_df: pd.DataFrame) -> List[int]:
@@ -930,6 +1036,17 @@ def analyze_session_nm_theta_roi(session_data: Dict,
     print("=" * 60)
     print("ROI ANALYSIS COMPLETE!")
     print("=" * 60)
+    
+    # Step 8: Export session theta power to CSV
+    print("Step 8: Exporting session theta power data to CSV")
+    export_session_theta_power_csv(
+        session_data=session_data,
+        normalized_windows=normalized_windows,
+        frequencies=freqs,
+        roi_channels=roi_channels,
+        roi_specification=roi_or_channels,
+        save_path=save_path
+    )
     
     return {
         'freqs': freqs,

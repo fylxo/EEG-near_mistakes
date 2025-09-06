@@ -1,0 +1,163 @@
+EEG NEAR MISTAKES DATASET - ANALYSIS SUMMARY
+============================================
+
+DATASET OVERVIEW
+================
+- Dataset Type: EEG theta power measurements during Near Mistakes (NM) events
+- Data Format: CSV files organized by electrode position
+- Total Files: 9,499 CSV files
+- Electrode Coverage: 32 electrode positions (electrode_[1] to electrode_[32])
+- Analysis Period: Various sessions from 2019-2020
+- Species: Rat EEG recordings
+
+DATA STRUCTURE
+==============
+File Organization:
+- Root directory: results/csv_exports/
+- Structure: electrode_[N]/session_theta_power_[RAT_ID]_[SESSION_DATE].csv
+- Each file contains one row of data per session-rat-electrode combination
+
+CSV File Format:
+Columns: session_number;rat_ID;electrode_number;NM_size1.0;NM_size2.0;NM_size3.0
+- session_number: Date identifier (DDMMYY format)
+- rat_ID: Unique rat identifier
+- electrode_number: Electrode position [1] to [32]
+- NM_size1.0: Theta power measurement for NM category 1.0
+- NM_size2.0: Theta power measurement for NM category 2.0  
+- NM_size3.0: Theta power measurement for NM category 3.0
+
+EXPERIMENTAL SUBJECTS
+====================
+Total Rats: 14 unique subjects
+
+Detailed Session Information:
++--------+----------+---------------+-------------------+
+| Rat ID | Sessions | Total Files   | Total NM Events   |
+|        |          | (32 electrodes)|                   |
++--------+----------+---------------+-------------------+
+| 442    | 37       | 1,184         | 7,960            |
+| 531    | 36       | 1,151         | 5,241            |
+| 422    | 35       | 1,120         | 6,585            |
+| 441    | 30       | 960           | 5,551            |
+| 532    | 28       | 892           | 5,787            |
+| 1055   | 23       | 736           | 3,725            |
+| 9592   | 23       | 736           | 4,192            |
+| 9442   | 24       | 480           | 4,618            |
+| 9151   | 19       | 608           | 3,200            |
+| 10501  | 18       | 576           | 2,538            |
+| 10593  | 12       | 384           | 2,099            |
+| 9441   | 8        | 256           | 1,611            |
+| 9591   | 7        | 224           | 1,672            |
+| 10592  | 6        | 192           | 1,087            |
++--------+----------+---------------+-------------------+
+
+MEASUREMENT VARIABLES
+====================
+Primary Variables:
+1. Theta Power by NM Category:
+   - NM_size1.0: Near mistake events of category 1.0
+   - NM_size2.0: Near mistake events of category 2.0
+   - NM_size3.0: Near mistake events of category 3.0
+
+2. Spatial Coverage:
+   - 32 electrode positions across the brain
+   - Full cortical and subcortical coverage
+
+3. Temporal Coverage:
+   - Multiple sessions per rat (6-37 sessions)
+   - Longitudinal design allowing within-subject analysis
+
+4. Cross-Subject Design:
+   - 14 different rats
+   - Inter-individual variability analysis possible
+
+DATA QUALITY NOTES
+==================
+- Complete electrode coverage: All 32 electrodes present for each session
+- Balanced design: Consistent file structure across all rats and sessions
+- Large sample size: 9,499 individual measurements
+- Comprehensive coverage: 282 total sessions across all rats
+- Note: Rat 9442 has 20 channels (mentioned in config file)
+
+STATISTICAL ANALYSIS OPPORTUNITIES
+==================================
+
+1. WITHIN-SUBJECT ANALYSES:
+   - Electrode-specific theta power patterns
+   - NM category differences within individual rats
+   - Session-to-session variability (longitudinal changes)
+   - Spatial distribution of theta power across brain regions
+
+2. BETWEEN-SUBJECT ANALYSES:
+   - Cross-rat consistency in theta power patterns
+   - Individual differences in NM-related theta modulation
+   - Population-level effects across all 14 rats
+
+3. FACTORIAL ANALYSES:
+   - Rat × Electrode × NM_category interactions
+   - Session effects (temporal changes)
+   - Brain region-specific responses to different NM categories
+
+4. SPATIAL ANALYSES:
+   - Topographic mapping of theta power
+   - Regional clustering of electrode responses
+   - Hemispheric differences in theta modulation
+
+5. TEMPORAL ANALYSES:
+   - Learning effects across sessions
+   - Session-dependent changes in theta power
+   - Stability of NM-related theta patterns over time
+
+RECOMMENDED STATISTICAL APPROACHES
+==================================
+
+1. Mixed-Effects Models:
+   - Random effects: Rat, Session
+   - Fixed effects: Electrode, NM_category
+   - Ideal for hierarchical data structure
+
+2. Repeated Measures ANOVA:
+   - Within-subjects: Electrode, NM_category
+   - Between-subjects: Rat groups (if applicable)
+
+3. Multivariate Analysis:
+   - Principal Component Analysis across electrodes
+   - Cluster analysis for electrode grouping
+   - Canonical correlation analysis
+
+4. Time Series Analysis:
+   - Session-dependent changes
+   - Trend analysis across recording periods
+
+5. Machine Learning Approaches:
+   - Classification of NM categories based on theta patterns
+   - Prediction of behavioral outcomes from theta power
+   - Feature selection for most informative electrodes
+
+TECHNICAL SPECIFICATIONS
+========================
+- Data Separator: Semicolon (;)
+- Numeric Format: Decimal values (both positive and negative)
+- Missing Data: No apparent missing values in examined samples
+- File Encoding: Standard text format
+- Electrode Numbering: [1] to [32] in brackets
+
+RESEARCH QUESTIONS FOR STATISTICAL ANALYSIS
+===========================================
+
+1. Primary Questions:
+   - Which brain regions show strongest theta power modulation during near mistakes?
+   - Are there consistent theta power patterns across different NM categories?
+   - Do individual rats show unique theta signatures during near mistakes?
+
+2. Secondary Questions:
+   - How does theta power change across recording sessions?
+   - Are there hemispheric differences in NM-related theta activity?
+   - Which electrode combinations best predict NM category?
+
+3. Exploratory Questions:
+   - Can we identify theta power biomarkers for near mistake detection?
+   - Are there electrode clusters that respond similarly to NM events?
+   - How variable are theta responses within vs. between individual rats?
+
+This comprehensive dataset provides excellent opportunities for understanding the neural mechanisms underlying near mistake detection through theta oscillation analysis.
